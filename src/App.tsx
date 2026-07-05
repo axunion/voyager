@@ -1,49 +1,58 @@
-import { createSignal } from "solid-js";
-import logo from "./assets/logo.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { openPath } from "@tauri-apps/plugin-opener";
+import X from "lucide-solid/icons/x";
+import { onMount, Show } from "solid-js";
+import { FileList } from "./components/FileList";
+import { Toolbar } from "./components/Toolbar";
+import type { Entry } from "./lib/ipc";
+import { explorer } from "./store/explorer";
 import "./App.css";
 
 function App() {
-  const [greetMsg, setGreetMsg] = createSignal("");
-  const [name, setName] = createSignal("");
+  onMount(() => {
+    explorer.init();
+  });
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name: name() }));
-  }
+  const handleOpen = (entry: Entry) => {
+    if (entry.is_dir) {
+      explorer.navigateTo(entry.path);
+    } else {
+      openPath(entry.path).catch((e) => explorer.setError(String(e)));
+    }
+  };
 
   return (
-    <main class="container">
-      <h1>Welcome to Tauri + Solid</h1>
-
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" class="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://solidjs.com" target="_blank">
-          <img src={logo} class="logo solid" alt="Solid logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and Solid logos to learn more.</p>
-
-      <form
-        class="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
+    <main class="app">
+      <Toolbar
+        currentPath={explorer.state.currentPath}
+        canGoBack={explorer.canGoBack()}
+        canGoForward={explorer.canGoForward()}
+        onBack={() => explorer.goBack()}
+        onForward={() => explorer.goForward()}
+      />
+      <Show when={explorer.state.error}>
+        <div class="error-banner" role="alert">
+          <span>{explorer.state.error}</span>
+          <button
+            type="button"
+            onClick={() => explorer.clearError()}
+            aria-label="Dismiss error"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </Show>
+      <div class="content" classList={{ dimmed: explorer.state.loading }}>
+        <FileList
+          entries={explorer.state.entries}
+          selectedPath={explorer.state.selectedPath}
+          onOpen={handleOpen}
+          onSelect={(entry) => explorer.select(entry.path)}
+          onDropMove={(src, targetDir) =>
+            explorer.moveIntoFolder(src, targetDir)
+          }
+          onTrash={(entry) => explorer.trashEntry(entry.path)}
         />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg()}</p>
+      </div>
     </main>
   );
 }

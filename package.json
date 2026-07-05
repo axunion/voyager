@@ -16,17 +16,22 @@
     }
   },
   "scripts": {
+    "prepare": "lefthook install",
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest run",
+    "check": "biome check . && tsc --noEmit",
+    "fix": "biome check --write ."
   },
   "license": "MIT",
   "dependencies": {
     "@kobalte/core": "^0.13.12",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "lucide-solid": "^1.23.0",
     "solid-js": "^1.9.3"
   },
   "devDependencies": {

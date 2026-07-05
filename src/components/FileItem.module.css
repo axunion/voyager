@@ -1,0 +1,57 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Fixed row height: precondition for dropping in a virtualizer later */
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 4px;
+  cursor: default;
+}
+
+.row:hover {
+  background: var(--hover-bg);
+}
+
+.selected,
+.selected:hover {
+  background: var(--selected-bg);
+}
+
+.dropTarget,
+.dropTarget:hover {
+  background: var(--drop-bg);
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--muted-color);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu {
+  min-width: 160px;
+  padding: 4px;
+  background: var(--menu-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.menuItem {
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  cursor: default;
+}
+
+.menuItem[data-highlighted] {
+  background: var(--hover-bg);
+}
