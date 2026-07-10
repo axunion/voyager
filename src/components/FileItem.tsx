@@ -59,8 +59,7 @@ export function FileItem(props: FileItemProps) {
   };
 
   const handleClick = () => {
-    if (props.entry.is_dir) props.onOpen(props.entry);
-    else props.onSelect(props.entry);
+    props.onSelect(props.entry);
   };
 
   return (
@@ -85,6 +84,7 @@ export function FileItem(props: FileItemProps) {
         }}
         onDrop={handleDrop}
         onClick={handleClick}
+        onDblClick={() => props.onOpen(props.entry)}
         onContextMenu={() => props.onSelect(props.entry)}
       >
         <Dynamic

@@ -3,3 +3,8 @@
   overflow-y: auto;
   padding: 4px;
 }
+
+.list:focus-visible {
+  outline: 1px solid var(--border-color);
+  outline-offset: -1px;
+}

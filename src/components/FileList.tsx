@@ -17,8 +17,20 @@ interface FileListProps {
 export function FileList(props: FileListProps) {
   // O(2) updates on selection change instead of re-running every row's effect
   const isSelected = createSelector(() => props.selectedPath);
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    const entry = props.entries.find((it) => it.path === props.selectedPath);
+    if (entry) props.onOpen(entry);
+  };
+
   return (
-    <div class={styles.list}>
+    <div
+      class={styles.list}
+      role="listbox"
+      tabindex="0"
+      onKeyDown={handleKeyDown}
+    >
       <For each={props.entries}>
         {(entry) => (
           <FileItem
