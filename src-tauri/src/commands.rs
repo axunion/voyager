@@ -76,6 +76,71 @@ pub fn move_to_trash(path: String) -> Result<(), String> {
     trash::delete(&path).map_err(|e| format!("Failed to move to trash: {e}"))
 }
 
+/// Renames the entry at `path` to `new_name` within the same parent directory.
+/// Returns the new path. Renaming to the same name is a no-op returning Ok(path).
+#[tauri::command]
+pub fn rename_entry(path: String, new_name: String) -> Result<String, String> {
+    validate_name(&new_name)?;
+    let src = Path::new(&path);
+    let parent = src
+        .parent()
+        .ok_or_else(|| format!("Invalid path: {path}"))?;
+    if src.file_name().and_then(|n| n.to_str()) == Some(new_name.as_str()) {
+        return Ok(path);
+    }
+    let dest = parent.join(&new_name);
+    if dest.exists() {
+        return Err(format!("\"{new_name}\" already exists"));
+    }
+    std::fs::rename(src, &dest).map_err(|e| format!("Failed to rename: {e}"))?;
+    Ok(dest.to_string_lossy().into_owned())
+}
+
+/// Creates a new directory (is_dir=true) or empty file (is_dir=false) named
+/// `name` inside `parent`. Returns the new path.
+#[tauri::command]
+pub fn create_entry(parent: String, name: String, is_dir: bool) -> Result<String, String> {
+    validate_name(&name)?;
+    let dest = Path::new(&parent).join(&name);
+    let map_create_err = |e: std::io::Error| {
+        if e.kind() == std::io::ErrorKind::AlreadyExists {
+            format!("\"{name}\" already exists")
+        } else {
+            format!("Failed to create: {e}")
+        }
+    };
+    if is_dir {
+        std::fs::create_dir(&dest).map_err(map_create_err)?;
+    } else {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&dest)
+            .map_err(map_create_err)?;
+    }
+    Ok(dest.to_string_lossy().into_owned())
+}
+
+/// Shared validation for user-supplied entry names.
+fn validate_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("Name cannot be empty".into());
+    }
+    if name.contains('/') || name.contains('\\') {
+        return Err("Name cannot contain path separators".into());
+    }
+    // read_directory skips dotfiles, so a created dotfile would silently
+    // disappear from the UI — reject instead of confusing the user.
+    if name.starts_with('.') {
+        return Err(if name == "." || name == ".." {
+            "Invalid name".into()
+        } else {
+            format!("\"{name}\" would be hidden")
+        });
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,5 +232,138 @@ mod tests {
 
         assert_eq!(err, "Cannot move a folder into itself");
         assert!(sub.exists());
+    }
+
+    #[test]
+    fn create_entry_creates_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = create_entry(
+            tmp.path().to_string_lossy().into_owned(),
+            "new.txt".into(),
+            false,
+        )
+        .unwrap();
+        assert!(Path::new(&path).is_file());
+    }
+
+    #[test]
+    fn create_entry_creates_directory() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = create_entry(
+            tmp.path().to_string_lossy().into_owned(),
+            "newdir".into(),
+            true,
+        )
+        .unwrap();
+        assert!(Path::new(&path).is_dir());
+    }
+
+    #[test]
+    fn create_entry_collision_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        touch(&tmp.path().join("dup.txt"));
+
+        let err = create_entry(
+            tmp.path().to_string_lossy().into_owned(),
+            "dup.txt".into(),
+            false,
+        )
+        .unwrap_err();
+
+        assert!(err.contains("already exists"));
+    }
+
+    #[test]
+    fn create_entry_empty_name_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let err =
+            create_entry(tmp.path().to_string_lossy().into_owned(), "".into(), false).unwrap_err();
+        assert!(err.contains("cannot be empty"));
+    }
+
+    #[test]
+    fn create_entry_path_separator_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let err = create_entry(
+            tmp.path().to_string_lossy().into_owned(),
+            "a/b".into(),
+            false,
+        )
+        .unwrap_err();
+        assert!(err.contains("path separators"));
+    }
+
+    #[test]
+    fn create_entry_dotdot_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let err = create_entry(
+            tmp.path().to_string_lossy().into_owned(),
+            "..".into(),
+            false,
+        )
+        .unwrap_err();
+        assert_eq!(err, "Invalid name");
+    }
+
+    #[test]
+    fn create_entry_leading_dot_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let err = create_entry(
+            tmp.path().to_string_lossy().into_owned(),
+            ".hidden".into(),
+            false,
+        )
+        .unwrap_err();
+        assert!(err.contains("would be hidden"));
+    }
+
+    #[test]
+    fn rename_entry_renames_successfully() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("old.txt");
+        touch(&src);
+
+        let new_path = rename_entry(src.to_string_lossy().into_owned(), "new.txt".into()).unwrap();
+
+        assert!(!src.exists());
+        assert!(Path::new(&new_path).exists());
+        assert_eq!(Path::new(&new_path), tmp.path().join("new.txt"));
+    }
+
+    #[test]
+    fn rename_entry_collision_errors_and_keeps_source() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("a.txt");
+        touch(&src);
+        touch(&tmp.path().join("b.txt"));
+
+        let err = rename_entry(src.to_string_lossy().into_owned(), "b.txt".into()).unwrap_err();
+
+        assert!(err.contains("already exists"));
+        assert!(src.exists());
+    }
+
+    #[test]
+    fn rename_entry_same_name_is_noop() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("same.txt");
+        touch(&src);
+
+        let path = rename_entry(src.to_string_lossy().into_owned(), "same.txt".into()).unwrap();
+
+        assert_eq!(Path::new(&path), src);
+        assert!(src.exists());
+    }
+
+    #[test]
+    fn rename_entry_invalid_name_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("c.txt");
+        touch(&src);
+
+        let err = rename_entry(src.to_string_lossy().into_owned(), "".into()).unwrap_err();
+
+        assert!(err.contains("cannot be empty"));
+        assert!(src.exists());
     }
 }

@@ -34,6 +34,18 @@
   white-space: nowrap;
 }
 
+.nameInput {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
 .menu {
   min-width: 160px;
   padding: 4px;

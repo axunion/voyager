@@ -1,7 +1,14 @@
 import { homeDir } from "@tauri-apps/api/path";
 import { batch } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Entry, moveEntry, moveToTrash, readDirectory } from "../lib/ipc";
+import {
+  createEntry,
+  type Entry,
+  moveEntry,
+  moveToTrash,
+  readDirectory,
+  renameEntry,
+} from "../lib/ipc";
 import {
   emptyHistory,
   type History,
@@ -20,10 +27,16 @@ interface TabState {
   loading: boolean;
 }
 
+export type EditingState =
+  | { mode: "rename"; path: string }
+  | { mode: "create"; isDir: boolean }
+  | null;
+
 interface ExplorerState {
   tabs: TabState[];
   activeTabId: number;
   error: string | null;
+  editing: EditingState; // global: only the active tab can edit
 }
 
 let nextTabId = 1;
@@ -45,6 +58,7 @@ const [state, setState] = createStore<ExplorerState>({
   tabs: [initialTab],
   activeTabId: initialTab.id,
   error: null,
+  editing: null,
 });
 
 function findTab(id: number): TabState | undefined {
@@ -59,6 +73,10 @@ function activeTab(): TabState {
 
 function tabIndex(id: number): number {
   return state.tabs.findIndex((t) => t.id === id);
+}
+
+function clearEditing(): void {
+  setState("editing", null);
 }
 
 // Looks up the tab by id and merges patch into it in one commit; no-ops
@@ -76,13 +94,20 @@ function updateTab(id: number, patch: Partial<TabState>): boolean {
 const loadSeq = new Map<number, number>();
 
 // On failure keeps the previous listing and path so the user stays where they were.
-async function load(tabId: number, path: string): Promise<boolean> {
+// `selectedPath` defaults to null (fresh listing, nothing selected); callers
+// that just created/renamed an entry pass its new path to select it in one commit.
+async function load(
+  tabId: number,
+  path: string,
+  selectedPath: string | null = null,
+): Promise<boolean> {
   const seq = (loadSeq.get(tabId) ?? 0) + 1;
   loadSeq.set(tabId, seq);
   if (tabIndex(tabId) === -1) return false;
   batch(() => {
     updateTab(tabId, { loading: true });
     setState("error", null);
+    clearEditing();
   });
   try {
     const entries = await readDirectory(path);
@@ -90,7 +115,7 @@ async function load(tabId: number, path: string): Promise<boolean> {
     return updateTab(tabId, {
       currentPath: path,
       entries,
-      selectedPath: null,
+      selectedPath,
       loading: false,
     });
   } catch (e) {
@@ -122,6 +147,24 @@ async function mutateAndReload(
     if (tab) await load(tabId, tab.currentPath);
   } catch (e) {
     setState("error", String(e));
+  }
+}
+
+// Shared by commitRename/commitCreate: runs the IPC call, reloads `path`
+// selecting the new entry, and always ends the edit session (on error too,
+// per spec: the edit ends and the banner shows).
+async function commitEdit(
+  tabId: number,
+  path: string,
+  action: () => Promise<string>,
+): Promise<void> {
+  try {
+    const newPath = await action();
+    await load(tabId, path, newPath);
+  } catch (e) {
+    setState("error", String(e));
+  } finally {
+    clearEditing();
   }
 }
 
@@ -172,6 +215,41 @@ export const explorer = {
     return mutateAndReload(state.activeTabId, () => moveToTrash(path));
   },
 
+  startRename(path: string): void {
+    setState("editing", { mode: "rename", path });
+  },
+
+  startCreate(isDir: boolean): void {
+    setState("editing", { mode: "create", isDir });
+  },
+
+  cancelEdit(): void {
+    clearEditing();
+  },
+
+  commitRename(newName: string): Promise<void> {
+    const editing = state.editing;
+    if (editing?.mode !== "rename") return Promise.resolve();
+    const tabId = state.activeTabId;
+    const tab = findTab(tabId);
+    if (!tab) return Promise.resolve();
+    return commitEdit(tabId, tab.currentPath, () =>
+      renameEntry(editing.path, newName),
+    );
+  },
+
+  commitCreate(name: string): Promise<void> {
+    const editing = state.editing;
+    if (editing?.mode !== "create") return Promise.resolve();
+    const tabId = state.activeTabId;
+    const tab = findTab(tabId);
+    if (!tab) return Promise.resolve();
+    const parent = tab.currentPath;
+    return commitEdit(tabId, parent, () =>
+      createEntry(parent, name, editing.isDir),
+    );
+  },
+
   setError(message: string): void {
     setState("error", message);
   },
@@ -200,10 +278,15 @@ export const explorer = {
     batch(() => {
       setState("tabs", (tabs) => tabs.filter((t) => t.id !== id));
       setState("activeTabId", newActiveId);
+      clearEditing();
     });
   },
 
   activateTab(id: number): void {
-    if (tabIndex(id) !== -1) setState("activeTabId", id);
+    if (tabIndex(id) === -1) return;
+    batch(() => {
+      setState("activeTabId", id);
+      clearEditing();
+    });
   },
 };

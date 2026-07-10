@@ -14,3 +14,9 @@ export const moveEntry = (source: string, targetDir: string) =>
 
 export const moveToTrash = (path: string) =>
   invoke<void>("move_to_trash", { path });
+
+export const renameEntry = (path: string, newName: string) =>
+  invoke<string>("rename_entry", { path, newName });
+
+export const createEntry = (parent: string, name: string, isDir: boolean) =>
+  invoke<string>("create_entry", { parent, name, isDir });

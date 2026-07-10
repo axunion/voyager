@@ -92,12 +92,19 @@ function App() {
           <FileList
             entries={explorer.activeTab().entries}
             selectedPath={explorer.activeTab().selectedPath}
+            editing={explorer.state.editing}
             onOpen={handleOpen}
             onSelect={(entry) => explorer.select(entry.path)}
             onDropMove={(src, targetDir) =>
               explorer.moveIntoFolder(src, targetDir)
             }
             onTrash={(entry) => explorer.trashEntry(entry.path)}
+            onRename={(entry) => explorer.startRename(entry.path)}
+            onNewFolder={() => explorer.startCreate(true)}
+            onNewFile={() => explorer.startCreate(false)}
+            onCommitRename={(name) => explorer.commitRename(name)}
+            onCommitCreate={(name) => explorer.commitCreate(name)}
+            onCancelEdit={() => explorer.cancelEdit()}
           />
         </div>
       </div>
