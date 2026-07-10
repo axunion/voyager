@@ -31,6 +31,13 @@ body {
   height: 100vh;
 }
 
+.body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
 .content {
   flex: 1;
   display: flex;

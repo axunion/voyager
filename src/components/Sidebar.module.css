@@ -1,0 +1,91 @@
+.sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  border-right: 1px solid var(--border-color);
+}
+
+.node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: default;
+}
+
+.node:hover {
+  background: var(--hover-bg);
+}
+
+.selected,
+.selected:hover {
+  background: var(--selected-bg);
+}
+
+.chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted-color);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.chevron:hover {
+  background: var(--hover-bg);
+}
+
+.chevron svg {
+  transition: transform 0.15s;
+}
+
+.chevron.expanded svg {
+  transform: rotate(90deg);
+}
+
+.chevron.loading svg {
+  animation: chevron-spin 0.8s linear infinite;
+}
+
+@keyframes chevron-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--muted-color);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}

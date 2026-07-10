@@ -2,15 +2,18 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import X from "lucide-solid/icons/x";
 import { onCleanup, onMount, Show } from "solid-js";
 import { FileList } from "./components/FileList";
+import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { Toolbar } from "./components/Toolbar";
 import type { Entry } from "./lib/ipc";
 import { explorer } from "./store/explorer";
+import { tree } from "./store/tree";
 import "./App.css";
 
 function App() {
   onMount(() => {
     explorer.init();
+    tree.init();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey) {
@@ -72,17 +75,31 @@ function App() {
           </button>
         </div>
       </Show>
-      <div class="content" classList={{ dimmed: explorer.activeTab().loading }}>
-        <FileList
-          entries={explorer.activeTab().entries}
-          selectedPath={explorer.activeTab().selectedPath}
-          onOpen={handleOpen}
-          onSelect={(entry) => explorer.select(entry.path)}
-          onDropMove={(src, targetDir) =>
-            explorer.moveIntoFolder(src, targetDir)
-          }
-          onTrash={(entry) => explorer.trashEntry(entry.path)}
+      <div class="body">
+        <Sidebar
+          rootPath={tree.state.rootPath}
+          expanded={tree.state.expanded}
+          children={tree.state.children}
+          loading={tree.state.loading}
+          currentPath={explorer.activeTab().currentPath}
+          onToggle={(path) => tree.toggle(path)}
+          onNavigate={(path) => explorer.navigateTo(path)}
         />
+        <div
+          class="content"
+          classList={{ dimmed: explorer.activeTab().loading }}
+        >
+          <FileList
+            entries={explorer.activeTab().entries}
+            selectedPath={explorer.activeTab().selectedPath}
+            onOpen={handleOpen}
+            onSelect={(entry) => explorer.select(entry.path)}
+            onDropMove={(src, targetDir) =>
+              explorer.moveIntoFolder(src, targetDir)
+            }
+            onTrash={(entry) => explorer.trashEntry(entry.path)}
+          />
+        </div>
       </div>
     </main>
   );
