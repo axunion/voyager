@@ -1,0 +1,75 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 160px;
+  padding: 0 6px 0 10px;
+  border-radius: 4px;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.tab:hover {
+  background: var(--hover-bg);
+}
+
+.active,
+.active:hover {
+  background: var(--selected-bg);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.close:hover {
+  background: var(--drop-bg);
+}
+
+.addButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.addButton:hover {
+  background: var(--hover-bg);
+}

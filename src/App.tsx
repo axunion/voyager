@@ -1,7 +1,8 @@
 import { openPath } from "@tauri-apps/plugin-opener";
 import X from "lucide-solid/icons/x";
-import { onMount, Show } from "solid-js";
+import { onCleanup, onMount, Show } from "solid-js";
 import { FileList } from "./components/FileList";
+import { TabBar } from "./components/TabBar";
 import { Toolbar } from "./components/Toolbar";
 import type { Entry } from "./lib/ipc";
 import { explorer } from "./store/explorer";
@@ -10,6 +11,20 @@ import "./App.css";
 function App() {
   onMount(() => {
     explorer.init();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === "t") {
+        e.preventDefault();
+        explorer.addTab();
+      } else if (key === "w") {
+        e.preventDefault();
+        explorer.closeTab(explorer.state.activeTabId);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
   });
 
   const handleOpen = (entry: Entry) => {
@@ -22,8 +37,15 @@ function App() {
 
   return (
     <main class="app">
+      <TabBar
+        tabs={explorer.state.tabs}
+        activeTabId={explorer.state.activeTabId}
+        onActivate={(id) => explorer.activateTab(id)}
+        onClose={(id) => explorer.closeTab(id)}
+        onAdd={() => explorer.addTab()}
+      />
       <Toolbar
-        currentPath={explorer.state.currentPath}
+        currentPath={explorer.activeTab().currentPath}
         canGoBack={explorer.canGoBack()}
         canGoForward={explorer.canGoForward()}
         onBack={() => explorer.goBack()}
@@ -41,10 +63,10 @@ function App() {
           </button>
         </div>
       </Show>
-      <div class="content" classList={{ dimmed: explorer.state.loading }}>
+      <div class="content" classList={{ dimmed: explorer.activeTab().loading }}>
         <FileList
-          entries={explorer.state.entries}
-          selectedPath={explorer.state.selectedPath}
+          entries={explorer.activeTab().entries}
+          selectedPath={explorer.activeTab().selectedPath}
           onOpen={handleOpen}
           onSelect={(entry) => explorer.select(entry.path)}
           onDropMove={(src, targetDir) =>
