@@ -3,6 +3,7 @@ import { createEffect, createSignal, onCleanup } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { iconFor } from "../lib/icons";
 import type { Entry } from "../lib/ipc";
+import { rowId } from "../lib/listNav";
 import styles from "./FileItem.module.css";
 
 const DRAG_TYPE = "application/x-voyager-path";
@@ -66,6 +67,9 @@ export function FileItem(props: FileItemProps) {
     <ContextMenu.Root>
       <ContextMenu.Trigger
         as="div"
+        id={rowId(props.entry.path)}
+        role="option"
+        aria-selected={props.selected}
         class={styles.row}
         classList={{
           [styles.selected]: props.selected,

@@ -13,14 +13,23 @@ function App() {
     explorer.init();
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      const key = e.key.toLowerCase();
-      if (key === "t") {
-        e.preventDefault();
-        explorer.addTab();
-      } else if (key === "w") {
-        e.preventDefault();
-        explorer.closeTab(explorer.state.activeTabId);
+      if (e.metaKey || e.ctrlKey) {
+        const key = e.key.toLowerCase();
+        if (key === "t") {
+          e.preventDefault();
+          explorer.addTab();
+        } else if (key === "w") {
+          e.preventDefault();
+          explorer.closeTab(explorer.state.activeTabId);
+        }
+      } else if (e.altKey) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          explorer.goBack();
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          explorer.goForward();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);

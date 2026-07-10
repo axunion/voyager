@@ -1,5 +1,6 @@
 import { createSelector, For } from "solid-js";
 import type { Entry } from "../lib/ipc";
+import { entryAfterMove, rowId } from "../lib/listNav";
 import { FileItem } from "./FileItem";
 import styles from "./FileList.module.css";
 
@@ -18,17 +19,40 @@ export function FileList(props: FileListProps) {
   // O(2) updates on selection change instead of re-running every row's effect
   const isSelected = createSelector(() => props.selectedPath);
 
+  let containerRef: HTMLDivElement | undefined;
+
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key !== "Enter") return;
-    const entry = props.entries.find((it) => it.path === props.selectedPath);
-    if (entry) props.onOpen(entry);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const next = entryAfterMove(
+        props.entries,
+        props.selectedPath,
+        e.key === "ArrowDown" ? 1 : -1,
+      );
+      if (!next) return;
+      props.onSelect(next);
+      containerRef
+        ?.querySelector(`[id="${rowId(next.path)}"]`)
+        ?.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    if (e.key === "Enter" || e.key === "Delete") {
+      const entry = props.entries.find((it) => it.path === props.selectedPath);
+      if (!entry) return;
+      if (e.key === "Enter") props.onOpen(entry);
+      else props.onTrash(entry);
+    }
   };
 
   return (
     <div
+      ref={containerRef}
       class={styles.list}
       role="listbox"
-      tabindex="0"
+      tabIndex="0"
+      aria-activedescendant={
+        props.selectedPath ? rowId(props.selectedPath) : undefined
+      }
       onKeyDown={handleKeyDown}
     >
       <For each={props.entries}>
