@@ -63,6 +63,8 @@ function App() {
         onBack={() => explorer.goBack()}
         onForward={() => explorer.goForward()}
         onNavigate={(p) => explorer.navigateTo(p)}
+        filterQuery={explorer.activeTab().filterQuery}
+        onFilterChange={(q) => explorer.setFilter(q)}
       />
       <Show when={explorer.state.error}>
         <div class="error-banner" role="alert">
@@ -90,23 +92,31 @@ function App() {
           class="content"
           classList={{ dimmed: explorer.activeTab().loading }}
         >
-          <FileList
-            entries={explorer.activeTab().entries}
-            selectedPath={explorer.activeTab().selectedPath}
-            editing={explorer.state.editing}
-            onOpen={handleOpen}
-            onSelect={(entry) => explorer.select(entry.path)}
-            onDropMove={(src, targetDir) =>
-              explorer.moveIntoFolder(src, targetDir)
+          <Show
+            when={
+              explorer.activeTab().entries.length === 0 ||
+              explorer.visibleEntries().length > 0
             }
-            onTrash={(entry) => explorer.trashEntry(entry.path)}
-            onRename={(entry) => explorer.startRename(entry.path)}
-            onNewFolder={() => explorer.startCreate(true)}
-            onNewFile={() => explorer.startCreate(false)}
-            onCommitRename={(name) => explorer.commitRename(name)}
-            onCommitCreate={(name) => explorer.commitCreate(name)}
-            onCancelEdit={() => explorer.cancelEdit()}
-          />
+            fallback={<div class="no-matches">No matching items</div>}
+          >
+            <FileList
+              entries={explorer.visibleEntries()}
+              selectedPath={explorer.activeTab().selectedPath}
+              editing={explorer.state.editing}
+              onOpen={handleOpen}
+              onSelect={(entry) => explorer.select(entry.path)}
+              onDropMove={(src, targetDir) =>
+                explorer.moveIntoFolder(src, targetDir)
+              }
+              onTrash={(entry) => explorer.trashEntry(entry.path)}
+              onRename={(entry) => explorer.startRename(entry.path)}
+              onNewFolder={() => explorer.startCreate(true)}
+              onNewFile={() => explorer.startCreate(false)}
+              onCommitRename={(name) => explorer.commitRename(name)}
+              onCommitCreate={(name) => explorer.commitCreate(name)}
+              onCancelEdit={() => explorer.cancelEdit()}
+            />
+          </Show>
         </div>
       </div>
     </main>

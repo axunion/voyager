@@ -10,9 +10,19 @@ interface ToolbarProps {
   onBack(): void;
   onForward(): void;
   onNavigate(path: string): void;
+  filterQuery: string;
+  onFilterChange(query: string): void;
 }
 
 export function Toolbar(props: ToolbarProps) {
+  const handleFilterKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      props.onFilterChange("");
+      (e.currentTarget as HTMLInputElement).blur();
+    }
+  };
+
   return (
     <header class={styles.toolbar}>
       <button
@@ -34,6 +44,14 @@ export function Toolbar(props: ToolbarProps) {
         <ArrowRight size={16} />
       </button>
       <PathBar currentPath={props.currentPath} onNavigate={props.onNavigate} />
+      <input
+        type="text"
+        class={styles.filterInput}
+        placeholder="Filter"
+        value={props.filterQuery}
+        onInput={(e) => props.onFilterChange(e.currentTarget.value)}
+        onKeyDown={handleFilterKeyDown}
+      />
     </header>
   );
 }

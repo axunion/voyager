@@ -1,6 +1,7 @@
 import { homeDir } from "@tauri-apps/api/path";
-import { batch } from "solid-js";
+import { batch, createMemo } from "solid-js";
 import { createStore } from "solid-js/store";
+import { filterEntries, matchesQuery } from "../lib/filterEntries";
 import {
   createEntry,
   type Entry,
@@ -25,6 +26,7 @@ interface TabState {
   history: History;
   selectedPath: string | null;
   loading: boolean;
+  filterQuery: string; // reset to "" by load()
 }
 
 export type EditingState =
@@ -49,6 +51,7 @@ function makeTab(path: string): TabState {
     history: emptyHistory,
     selectedPath: null,
     loading: false,
+    filterQuery: "",
   };
 }
 
@@ -74,6 +77,11 @@ function activeTab(): TabState {
 function tabIndex(id: number): number {
   return state.tabs.findIndex((t) => t.id === id);
 }
+
+// The active tab's entries after applying its filterQuery.
+const visibleEntries = createMemo(() =>
+  filterEntries(activeTab().entries, activeTab().filterQuery),
+);
 
 function clearEditing(): void {
   setState("editing", null);
@@ -117,6 +125,7 @@ async function load(
       entries,
       selectedPath,
       loading: false,
+      filterQuery: "",
     });
   } catch (e) {
     if (loadSeq.get(tabId) !== seq) return false;
@@ -172,6 +181,7 @@ export const explorer = {
   state,
 
   activeTab,
+  visibleEntries,
 
   async init(): Promise<void> {
     try {
@@ -203,6 +213,19 @@ export const explorer = {
 
   select(path: string): void {
     updateTab(state.activeTabId, { selectedPath: path });
+  },
+
+  setFilter(query: string): void {
+    const tab = activeTab();
+    const stillMatches =
+      tab.selectedPath !== null &&
+      tab.entries.some(
+        (e) => e.path === tab.selectedPath && matchesQuery(e, query),
+      );
+    updateTab(tab.id, {
+      filterQuery: query,
+      selectedPath: stillMatches ? tab.selectedPath : null,
+    });
   },
 
   moveIntoFolder(source: string, targetDir: string): Promise<void> {

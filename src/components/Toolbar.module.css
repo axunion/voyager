@@ -28,3 +28,15 @@
   opacity: 0.35;
   cursor: default;
 }
+
+.filterInput {
+  flex: none;
+  width: 160px;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 4px 4px;
+}
