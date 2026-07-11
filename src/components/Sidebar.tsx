@@ -12,6 +12,7 @@ interface SidebarProps {
   currentPath: string;
   onToggle(path: string): void;
   onNavigate(path: string): void;
+  onDropMove(sourcePath: string, targetDirPath: string): void;
 }
 
 // Dumb wrapper: no reference to the tree/explorer stores, data comes in via
@@ -31,6 +32,7 @@ export function Sidebar(props: SidebarProps) {
         isSelected={isSelected}
         onToggle={props.onToggle}
         onNavigate={props.onNavigate}
+        onDropMove={props.onDropMove}
       />
     </nav>
   );

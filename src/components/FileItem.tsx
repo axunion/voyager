@@ -1,12 +1,16 @@
 import * as ContextMenu from "@kobalte/core/context-menu";
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
+import {
+  acceptsVoyagerDrag,
+  createDragOverTarget,
+  readVoyagerPath,
+  startVoyagerDrag,
+} from "../lib/dnd";
 import { iconFor } from "../lib/icons";
 import type { Entry } from "../lib/ipc";
 import { rowId } from "../lib/listNav";
 import styles from "./FileItem.module.css";
-
-const DRAG_TYPE = "application/x-voyager-path";
 
 interface FileItemProps {
   entry: Entry;
@@ -23,7 +27,9 @@ interface FileItemProps {
 }
 
 export function FileItem(props: FileItemProps) {
-  const [dragOver, setDragOver] = createSignal(false);
+  const dropTarget = createDragOverTarget(
+    (e) => props.entry.is_dir && acceptsVoyagerDrag(e),
+  );
   let inputRef: HTMLInputElement | undefined;
 
   createEffect(() => {
@@ -48,40 +54,14 @@ export function FileItem(props: FileItemProps) {
     props.onCommitRename((e.currentTarget as HTMLInputElement).value);
   };
 
-  // Fallback for webviews that skip the terminal dragleave on cancelled drags:
-  // while highlighted, any drag ending anywhere clears the highlight.
-  createEffect(() => {
-    if (!dragOver()) return;
-    const reset = () => setDragOver(false);
-    document.addEventListener("dragend", reset);
-    document.addEventListener("drop", reset);
-    onCleanup(() => {
-      document.removeEventListener("dragend", reset);
-      document.removeEventListener("drop", reset);
-    });
-  });
-
-  // The payload is unreadable during dragover (HTML5 protected mode),
-  // so accept/reject based on the declared type only.
-  const acceptsDrop = (e: DragEvent) =>
-    props.entry.is_dir && (e.dataTransfer?.types.includes(DRAG_TYPE) ?? false);
-
   const handleDragStart = (e: DragEvent) => {
-    if (!e.dataTransfer) return;
-    e.dataTransfer.setData(DRAG_TYPE, props.entry.path);
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (e: DragEvent) => {
-    if (!acceptsDrop(e)) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    startVoyagerDrag(e, props.entry.path);
   };
 
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
-    setDragOver(false);
-    const source = e.dataTransfer?.getData(DRAG_TYPE);
+    dropTarget.clear();
+    const source = readVoyagerPath(e);
     if (source && source !== props.entry.path) {
       props.onDropMove(source, props.entry.path);
     }
@@ -101,19 +81,13 @@ export function FileItem(props: FileItemProps) {
         class={styles.row}
         classList={{
           [styles.selected]: props.selected,
-          [styles.dropTarget]: dragOver(),
+          [styles.dropTarget]: dropTarget.dragOver(),
         }}
         draggable={!props.editing}
         onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnter={(e: DragEvent) => {
-          if (acceptsDrop(e)) setDragOver(true);
-        }}
-        onDragLeave={(e: DragEvent & { currentTarget: Node }) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-            setDragOver(false);
-          }
-        }}
+        onDragOver={dropTarget.onDragOver}
+        onDragEnter={dropTarget.onDragEnter}
+        onDragLeave={dropTarget.onDragLeave}
         onDrop={handleDrop}
         onClick={handleClick}
         onDblClick={() => {

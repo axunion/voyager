@@ -29,6 +29,11 @@
   background: var(--selected-bg);
 }
 
+.dropTarget,
+.dropTarget:hover {
+  background: var(--drop-bg);
+}
+
 .label {
   overflow: hidden;
   text-overflow: ellipsis;

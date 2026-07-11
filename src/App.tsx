@@ -55,6 +55,7 @@ function App() {
         onActivate={(id) => explorer.activateTab(id)}
         onClose={(id) => explorer.closeTab(id)}
         onAdd={() => explorer.addTab()}
+        onDropMove={(src, targetDir) => explorer.moveIntoFolder(src, targetDir)}
       />
       <Toolbar
         currentPath={explorer.activeTab().currentPath}
@@ -87,6 +88,9 @@ function App() {
           currentPath={explorer.activeTab().currentPath}
           onToggle={(path) => tree.toggle(path)}
           onNavigate={(path) => explorer.navigateTo(path)}
+          onDropMove={(src, targetDir) =>
+            explorer.moveIntoFolder(src, targetDir)
+          }
         />
         <div
           class="content"

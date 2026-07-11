@@ -1,6 +1,11 @@
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Folder from "lucide-solid/icons/folder";
 import { For, Show } from "solid-js";
+import {
+  acceptsVoyagerDrag,
+  createDragOverTarget,
+  readVoyagerPath,
+} from "../lib/dnd";
 import type { Entry } from "../lib/ipc";
 import styles from "./Sidebar.module.css";
 
@@ -13,19 +18,38 @@ interface TreeNodeProps {
   isSelected(path: string): boolean;
   onToggle(path: string): void;
   onNavigate(path: string): void;
+  onDropMove(sourcePath: string, targetDirPath: string): void;
 }
 
 // Recursive: a node renders its own row plus, when expanded, one TreeNode
 // per cached child directory.
 export function TreeNode(props: TreeNodeProps) {
+  const dropTarget = createDragOverTarget(acceptsVoyagerDrag);
   const isExpanded = () => props.expanded[props.entry.path] ?? false;
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    dropTarget.clear();
+    const source = readVoyagerPath(e);
+    if (source && source !== props.entry.path) {
+      props.onDropMove(source, props.entry.path);
+    }
+  };
 
   return (
     <div>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: drop target only, the chevron/label buttons remain the keyboard-interactive controls */}
       <div
         class={styles.node}
-        classList={{ [styles.selected]: props.isSelected(props.entry.path) }}
+        classList={{
+          [styles.selected]: props.isSelected(props.entry.path),
+          [styles.dropTarget]: dropTarget.dragOver(),
+        }}
         style={{ "padding-left": `${8 + props.depth * 16}px` }}
+        onDragOver={dropTarget.onDragOver}
+        onDragEnter={dropTarget.onDragEnter}
+        onDragLeave={dropTarget.onDragLeave}
+        onDrop={handleDrop}
       >
         <button
           type="button"
@@ -60,6 +84,7 @@ export function TreeNode(props: TreeNodeProps) {
               isSelected={props.isSelected}
               onToggle={props.onToggle}
               onNavigate={props.onNavigate}
+              onDropMove={props.onDropMove}
             />
           )}
         </For>

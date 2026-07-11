@@ -25,6 +25,11 @@
   background: var(--selected-bg);
 }
 
+.dropTarget,
+.dropTarget:hover {
+  background: var(--drop-bg);
+}
+
 .chevron {
   display: flex;
   align-items: center;
