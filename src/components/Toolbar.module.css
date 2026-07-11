@@ -28,12 +28,3 @@
   opacity: 0.35;
   cursor: default;
 }
-
-.path {
-  margin-left: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  color: var(--muted-color);
-}

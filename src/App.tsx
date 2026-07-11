@@ -62,6 +62,7 @@ function App() {
         canGoForward={explorer.canGoForward()}
         onBack={() => explorer.goBack()}
         onForward={() => explorer.goForward()}
+        onNavigate={(p) => explorer.navigateTo(p)}
       />
       <Show when={explorer.state.error}>
         <div class="error-banner" role="alert">

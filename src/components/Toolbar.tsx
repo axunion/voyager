@@ -1,5 +1,6 @@
 import ArrowLeft from "lucide-solid/icons/arrow-left";
 import ArrowRight from "lucide-solid/icons/arrow-right";
+import { PathBar } from "./PathBar";
 import styles from "./Toolbar.module.css";
 
 interface ToolbarProps {
@@ -8,6 +9,7 @@ interface ToolbarProps {
   canGoForward: boolean;
   onBack(): void;
   onForward(): void;
+  onNavigate(path: string): void;
 }
 
 export function Toolbar(props: ToolbarProps) {
@@ -31,9 +33,7 @@ export function Toolbar(props: ToolbarProps) {
       >
         <ArrowRight size={16} />
       </button>
-      <span class={styles.path} title={props.currentPath}>
-        {props.currentPath}
-      </span>
+      <PathBar currentPath={props.currentPath} onNavigate={props.onNavigate} />
     </header>
   );
 }

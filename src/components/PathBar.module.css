@@ -1,0 +1,68 @@
+.pathBar {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  cursor: text;
+}
+
+.segments {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.segments.faded {
+  mask-image: linear-gradient(to right, transparent, black 32px);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 32px);
+}
+
+.segment {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--muted-color);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.segment:hover {
+  background: var(--hover-bg);
+}
+
+.separator {
+  flex: none;
+  color: var(--muted-color);
+  font-size: 13px;
+}
+
+.filler {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  cursor: text;
+  padding: 0;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0 4px;
+}
