@@ -14,11 +14,29 @@ export function readVoyagerPath(e: DragEvent): string | null {
   return e.dataTransfer?.getData(DRAG_TYPE) || null;
 }
 
+// Tracks whether a voyager-origin drag is currently in progress, app-wide.
+// Used to keep the drag source's tab content mounted (but hidden) across an
+// active-tab switch, since only the active tab's FileList is rendered and
+// unmounting the dragged row mid-drag cancels the native drag session.
+const [dragActive, setDragActive] = createSignal(false);
+export const isDragActive = dragActive;
+
+// Module-scoped fallback: ends the tracked drag regardless of which element
+// the browser fires these on (mirrors the dragend/drop fallback pattern in
+// createDragOverTarget below). Guarded because this module is also imported
+// under Vitest's node environment, where `document` doesn't exist.
+if (typeof document !== "undefined") {
+  const reset = () => setDragActive(false);
+  document.addEventListener("dragend", reset);
+  document.addEventListener("drop", reset);
+}
+
 // Sets the drag payload on dragstart.
 export function startVoyagerDrag(e: DragEvent, path: string): void {
   if (!e.dataTransfer) return;
   e.dataTransfer.setData(DRAG_TYPE, path);
   e.dataTransfer.effectAllowed = "move";
+  setDragActive(true);
 }
 
 interface DragOverTarget {

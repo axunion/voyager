@@ -1,16 +1,44 @@
 import { openPath } from "@tauri-apps/plugin-opener";
 import X from "lucide-solid/icons/x";
-import { onCleanup, onMount, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  onMount,
+  Show,
+  untrack,
+} from "solid-js";
 import { FileList } from "./components/FileList";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { Toolbar } from "./components/Toolbar";
+import { isDragActive } from "./lib/dnd";
+import { filterEntries } from "./lib/filterEntries";
 import type { Entry } from "./lib/ipc";
 import { explorer } from "./store/explorer";
+import { renderedTabIds } from "./store/tabs";
 import { tree } from "./store/tree";
 import "./App.css";
 
 function App() {
+  // The tab a drag started from, kept mounted (hidden) if the user switches
+  // away mid-drag, so the dragged row's DOM survives the switch — see
+  // spec/11-tab-hover-switch.md.
+  const [dragOriginTabId, setDragOriginTabId] = createSignal<number | null>(
+    null,
+  );
+  createEffect(() => {
+    if (isDragActive()) {
+      setDragOriginTabId(
+        (prev) => prev ?? untrack(() => explorer.state.activeTabId),
+      );
+    } else {
+      setDragOriginTabId(null);
+    }
+  });
+
   onMount(() => {
     explorer.init();
     tree.init();
@@ -96,31 +124,46 @@ function App() {
           class="content"
           classList={{ dimmed: explorer.activeTab().loading }}
         >
-          <Show
-            when={
-              explorer.activeTab().entries.length === 0 ||
-              explorer.visibleEntries().length > 0
-            }
-            fallback={<div class="no-matches">No matching items</div>}
+          <For
+            each={renderedTabIds(explorer.state.activeTabId, dragOriginTabId())}
           >
-            <FileList
-              entries={explorer.visibleEntries()}
-              selectedPath={explorer.activeTab().selectedPath}
-              editing={explorer.state.editing}
-              onOpen={handleOpen}
-              onSelect={(entry) => explorer.select(entry.path)}
-              onDropMove={(src, targetDir) =>
-                explorer.moveIntoFolder(src, targetDir)
-              }
-              onTrash={(entry) => explorer.trashEntry(entry.path)}
-              onRename={(entry) => explorer.startRename(entry.path)}
-              onNewFolder={() => explorer.startCreate(true)}
-              onNewFile={() => explorer.startCreate(false)}
-              onCommitRename={(name) => explorer.commitRename(name)}
-              onCommitCreate={(name) => explorer.commitCreate(name)}
-              onCancelEdit={() => explorer.cancelEdit()}
-            />
-          </Show>
+            {(tabId) => {
+              const visible = () => tabId === explorer.state.activeTabId;
+              const tab = createMemo(
+                () => explorer.tab(tabId) ?? explorer.activeTab(),
+              );
+              const entries = createMemo(() =>
+                filterEntries(tab().entries, tab().filterQuery),
+              );
+              return (
+                <div class="file-pane" classList={{ hidden: !visible() }}>
+                  <Show
+                    when={tab().entries.length === 0 || entries().length > 0}
+                    fallback={<div class="no-matches">No matching items</div>}
+                  >
+                    <FileList
+                      entries={entries()}
+                      currentPath={tab().currentPath}
+                      selectedPath={tab().selectedPath}
+                      editing={visible() ? explorer.state.editing : null}
+                      onOpen={handleOpen}
+                      onSelect={(entry) => explorer.select(entry.path)}
+                      onDropMove={(src, targetDir) =>
+                        explorer.moveIntoFolder(src, targetDir)
+                      }
+                      onTrash={(entry) => explorer.trashEntry(entry.path)}
+                      onRename={(entry) => explorer.startRename(entry.path)}
+                      onNewFolder={() => explorer.startCreate(true)}
+                      onNewFile={() => explorer.startCreate(false)}
+                      onCommitRename={(name) => explorer.commitRename(name)}
+                      onCommitCreate={(name) => explorer.commitCreate(name)}
+                      onCancelEdit={() => explorer.cancelEdit()}
+                    />
+                  </Show>
+                </div>
+              );
+            }}
+          </For>
         </div>
       </div>
     </main>

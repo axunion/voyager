@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { basename, nextActiveTabId } from "./tabs";
+import { basename, nextActiveTabId, renderedTabIds } from "./tabs";
 
 describe("nextActiveTabId", () => {
   const tabs = [{ id: 1 }, { id: 2 }, { id: 3 }];
@@ -28,5 +28,19 @@ describe("basename", () => {
 
   it("tolerates a trailing slash", () => {
     expect(basename("/Users/foo/")).toBe("foo");
+  });
+});
+
+describe("renderedTabIds", () => {
+  it("returns only the active tab when no drag is in progress", () => {
+    expect(renderedTabIds(2, null)).toEqual([2]);
+  });
+
+  it("returns only the active tab when the drag originated there", () => {
+    expect(renderedTabIds(2, 2)).toEqual([2]);
+  });
+
+  it("returns origin then active when they differ", () => {
+    expect(renderedTabIds(2, 1)).toEqual([1, 2]);
   });
 });

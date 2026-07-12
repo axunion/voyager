@@ -7,6 +7,11 @@ import {
   Show,
 } from "solid-js";
 import { Dynamic } from "solid-js/web";
+import {
+  acceptsVoyagerDrag,
+  createDragOverTarget,
+  readVoyagerPath,
+} from "../lib/dnd";
 import { iconFor } from "../lib/icons";
 import type { Entry } from "../lib/ipc";
 import { entryAfterMove, rowId } from "../lib/listNav";
@@ -17,6 +22,7 @@ import styles from "./FileList.module.css";
 
 interface FileListProps {
   entries: Entry[];
+  currentPath: string;
   selectedPath: string | null;
   editing: EditingState;
   onOpen(entry: Entry): void;
@@ -46,6 +52,32 @@ export function FileList(props: FileListProps) {
 
   let containerRef: HTMLDivElement | undefined;
   let phantomInputRef: HTMLInputElement | undefined;
+
+  // Dropping on blank list space (not a row) moves into the directory this
+  // list is showing. Guarded by `e.target === e.currentTarget` so a drop
+  // that bubbled up from a row (already handled by FileItem's own drop
+  // target) is left alone here — no need to touch FileItem's handlers.
+  const backgroundDropTarget = createDragOverTarget(acceptsVoyagerDrag);
+
+  // Runs `fn` only for events targeting the container itself, not ones
+  // bubbled up from a row.
+  const onlyForBackground = (fn: (e: DragEvent) => void) => (e: DragEvent) => {
+    if (e.target === e.currentTarget) fn(e);
+  };
+  const handleContainerDragOver = onlyForBackground(
+    backgroundDropTarget.onDragOver,
+  );
+  const handleContainerDragEnter = onlyForBackground(
+    backgroundDropTarget.onDragEnter,
+  );
+
+  const handleContainerDrop = (e: DragEvent) => {
+    if (e.target !== e.currentTarget) return;
+    e.preventDefault();
+    backgroundDropTarget.clear();
+    const source = readVoyagerPath(e);
+    if (source) props.onDropMove(source, props.currentPath);
+  };
 
   createEffect(() => {
     if (props.editing?.mode === "create" && phantomInputRef) {
@@ -106,12 +138,17 @@ export function FileList(props: FileListProps) {
         as="div"
         ref={containerRef}
         class={styles.list}
+        classList={{ [styles.dropTarget]: backgroundDropTarget.dragOver() }}
         role="listbox"
         tabIndex="0"
         aria-activedescendant={
           props.selectedPath ? rowId(props.selectedPath) : undefined
         }
         onKeyDown={handleKeyDown}
+        onDragOver={handleContainerDragOver}
+        onDragEnter={handleContainerDragEnter}
+        onDragLeave={backgroundDropTarget.onDragLeave}
+        onDrop={handleContainerDrop}
       >
         <For each={props.entries}>
           {(entry) => (

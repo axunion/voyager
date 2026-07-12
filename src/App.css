@@ -54,6 +54,25 @@ body {
   color: var(--muted-color);
 }
 
+/* Wraps each rendered tab's FileList in the content area. The hidden
+   variant uses visibility (not display: none) because display: none can
+   cancel an in-progress native HTML5 drag on the row it contains — see
+   spec/11-tab-hover-switch.md. */
+.file-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.file-pane.hidden {
+  visibility: hidden;
+  flex: none;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .error-banner {
   display: flex;
   align-items: center;

@@ -9,6 +9,10 @@
   outline-offset: -1px;
 }
 
+.dropTarget {
+  background: var(--drop-bg);
+}
+
 .phantomRow {
   display: flex;
   align-items: center;

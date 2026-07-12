@@ -60,6 +60,10 @@ export function FileItem(props: FileItemProps) {
 
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
+    // Stops this from also reaching FileList's own background drop target
+    // (bubbling would otherwise fire a second, redundant move for the same
+    // drop).
+    e.stopPropagation();
     dropTarget.clear();
     const source = readVoyagerPath(e);
     if (source && source !== props.entry.path) {

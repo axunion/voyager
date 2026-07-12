@@ -1,7 +1,7 @@
 import { homeDir } from "@tauri-apps/api/path";
-import { batch, createMemo } from "solid-js";
+import { batch } from "solid-js";
 import { createStore } from "solid-js/store";
-import { filterEntries, matchesQuery } from "../lib/filterEntries";
+import { matchesQuery } from "../lib/filterEntries";
 import {
   createEntry,
   type Entry,
@@ -77,11 +77,6 @@ function activeTab(): TabState {
 function tabIndex(id: number): number {
   return state.tabs.findIndex((t) => t.id === id);
 }
-
-// The active tab's entries after applying its filterQuery.
-const visibleEntries = createMemo(() =>
-  filterEntries(activeTab().entries, activeTab().filterQuery),
-);
 
 function clearEditing(): void {
   setState("editing", null);
@@ -181,7 +176,7 @@ export const explorer = {
   state,
 
   activeTab,
-  visibleEntries,
+  tab: findTab,
 
   async init(): Promise<void> {
     try {

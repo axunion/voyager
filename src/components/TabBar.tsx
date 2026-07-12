@@ -1,9 +1,10 @@
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
-import { createSelector, For, Show } from "solid-js";
+import { createEffect, createSelector, For, Show } from "solid-js";
 import {
   acceptsVoyagerDrag,
   createDragOverTarget,
+  isDragActive,
   readVoyagerPath,
 } from "../lib/dnd";
 import { basename } from "../store/tabs";
@@ -23,6 +24,11 @@ interface TabBarProps {
   onDropMove(sourcePath: string, targetDirPath: string): void;
 }
 
+// Hovering a file drag over an inactive tab this long auto-switches to it.
+// Safe to do mid-drag: App.tsx keeps the drag's origin tab mounted (hidden)
+// across the switch, so the dragged row's DOM never unmounts.
+const HOVER_SWITCH_DELAY_MS = 600;
+
 function TabItem(props: {
   tab: Tab;
   active: boolean;
@@ -34,11 +40,48 @@ function TabItem(props: {
   const dropTarget = createDragOverTarget(acceptsVoyagerDrag);
   const label = () => basename(props.tab.currentPath);
 
+  let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+  const clearHoverTimer = () => {
+    if (hoverTimer !== undefined) {
+      clearTimeout(hoverTimer);
+      hoverTimer = undefined;
+    }
+  };
+  // Fallback for a drag cancelled (e.g. Esc) without a dragleave on this tab:
+  // reuses the app-wide drag-tracking signal instead of each tab registering
+  // its own document listener.
+  createEffect(() => {
+    if (!isDragActive()) clearHoverTimer();
+  });
+
+  const handleDragEnter = (e: DragEvent) => {
+    dropTarget.onDragEnter(e);
+    if (!props.active && acceptsVoyagerDrag(e)) {
+      clearHoverTimer();
+      hoverTimer = setTimeout(() => {
+        hoverTimer = undefined;
+        props.onActivate(props.tab.id);
+      }, HOVER_SWITCH_DELAY_MS);
+    }
+  };
+
+  const handleDragLeave = (e: DragEvent & { currentTarget: Node }) => {
+    dropTarget.onDragLeave(e);
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      clearHoverTimer();
+    }
+  };
+
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
+    clearHoverTimer();
     dropTarget.clear();
     const source = readVoyagerPath(e);
-    if (source) props.onDropMove(source, props.tab.currentPath);
+    if (!source) return;
+    // Handles a drop that beat the hover timer (< 600ms): switch and move
+    // together. Safe synchronously now for the same reason as the timer.
+    if (!props.active) props.onActivate(props.tab.id);
+    props.onDropMove(source, props.tab.currentPath);
   };
 
   return (
@@ -59,8 +102,8 @@ function TabItem(props: {
         }
       }}
       onDragOver={dropTarget.onDragOver}
-      onDragEnter={dropTarget.onDragEnter}
-      onDragLeave={dropTarget.onDragLeave}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       <span class={styles.label}>{label()}</span>
