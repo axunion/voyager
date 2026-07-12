@@ -31,7 +31,7 @@ with the project's quality gates built in.
    extracted pure modules, Rust `tempfile` tests in `commands.rs`. No DOM/E2E
    tests, no new frameworks.
 
-6. **Run the completion gate** (see `.claude/rules/voyager.md`); iterate
+6. **Run the completion gate** (see `CLAUDE.md`); iterate
    until everything is green.
 
 7. **Independent review.** Launch the `code-reviewer` agent, passing the spec

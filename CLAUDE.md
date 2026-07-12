@@ -1,7 +1,69 @@
-# Global Claude Rules
+# Voyager — Claude Rules
 
-Behavioral defaults plus house conventions. Bias toward caution over speed; on trivial
-tasks, use judgment.
+Tauri v2 + SolidJS + Rust desktop file explorer. Project rules first, general
+behavioral defaults below. Bias toward caution over speed; on trivial tasks,
+use judgment.
+
+## Product invariants
+
+Voyager exists to be a lightweight file manager that leaves no traces. These
+are permanent constraints, not current limitations:
+
+- **Zero persistence.** Never write caches, history, or settings anywhere —
+  no localStorage/sessionStorage, no config files, no store plugins. All app
+  state lives in session-only memory and dies with the process.
+- **No OS clipboard.** File copy/cut/paste uses the in-app clipboard only.
+- **No content display.** No previews or thumbnails; file-type icons only.
+- **Lightweight.** No new runtime dependencies unless a spec explicitly
+  requires one.
+
+Modern-filer UX (tabs, keyboard shortcuts, mouse, DnD) is in scope and driven
+by the spec roadmap.
+
+## Architecture
+
+- Rust commands live in `src-tauri/src/commands.rs` and are registered in
+  `generate_handler!` in `src-tauri/src/lib.rs`. Every command gets a typed
+  wrapper in `src/lib/ipc.ts`.
+- State is a singleton facade store (`src/store/explorer.ts`). Pure logic is
+  extracted into separate tested modules (`src/lib/*`, `src/store/history.ts`);
+  the reactive store itself is not tested.
+- Components are dumb (props only). Only `src/App.tsx` touches the stores.
+
+## Conventions
+
+Before modifying anything under `src/` or `src-tauri/`, read
+`spec/00-conventions.md` — the single source of truth for error format, IPC,
+store, component, CSS, and test conventions. Do not restate its content.
+
+## Repo invariants
+
+- No new UI libraries (`@kobalte/core` only) and no new test frameworks.
+- No DOM or E2E tests — Vitest covers pure logic modules only.
+- Never touch `src-tauri/capabilities/` or `src-tauri/tauri.conf.json` unless
+  the feature spec explicitly requires it.
+- Colors come only from `:root` custom properties in `src/App.css`; row height
+  is fixed at 28px.
+
+## Feature workflow
+
+- Roadmap features are bounded by their `spec/NN-*.md`: Non-goals are
+  prohibitions, and changes stay within the spec's File changes table.
+- `spec/README.md` is the roadmap index: pick work from its status table and
+  update the status on completion. Completed spec files are deleted (numbers
+  stay as gaps); on-hold specs remain as investigation records.
+- Exception to the English-only rule below: `spec/` prose is written in
+  Japanese (code identifiers, types, and error messages stay English).
+
+## Completion gate
+
+Run before finishing any implementation work:
+
+```sh
+pnpm check          # biome check + tsc --noEmit
+pnpm test           # vitest run
+cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+```
 
 ## Approach
 
@@ -22,7 +84,8 @@ tasks, use judgment.
 ## Language
 
 Write in **English only**: in-code comments, console output, error and log messages, and
-AI-readable config files (CLAUDE.md, AGENT.md, etc.).
+AI-readable config files (CLAUDE.md, AGENT.md, etc.). The only exception is `spec/` prose
+(see Feature workflow).
 
 ## Code Structure
 
