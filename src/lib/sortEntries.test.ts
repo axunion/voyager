@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Entry } from "./ipc";
-import { sortEntries } from "./sortEntries";
+import { nextSort, sortEntries } from "./sortEntries";
 
 const dir = (name: string, mtime: number | null = null): Entry => ({
   name,
@@ -138,5 +138,39 @@ describe("sortEntries", () => {
     const original = [...entries];
     sortEntries(entries, "name", "asc");
     expect(entries).toEqual(original);
+  });
+});
+
+describe("nextSort", () => {
+  it("toggles direction when clicking the active key", () => {
+    expect(nextSort({ key: "name", dir: "asc" }, "name")).toEqual({
+      key: "name",
+      dir: "desc",
+    });
+    expect(nextSort({ key: "size", dir: "desc" }, "size")).toEqual({
+      key: "size",
+      dir: "asc",
+    });
+  });
+
+  it("switches to name with asc as the default direction", () => {
+    expect(nextSort({ key: "size", dir: "desc" }, "name")).toEqual({
+      key: "name",
+      dir: "asc",
+    });
+  });
+
+  it("switches to size with desc as the default direction", () => {
+    expect(nextSort({ key: "name", dir: "asc" }, "size")).toEqual({
+      key: "size",
+      dir: "desc",
+    });
+  });
+
+  it("switches to mtime with desc as the default direction", () => {
+    expect(nextSort({ key: "name", dir: "asc" }, "mtime")).toEqual({
+      key: "mtime",
+      dir: "desc",
+    });
   });
 });

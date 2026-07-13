@@ -10,6 +10,7 @@ import {
   readDirectory,
   renameEntry,
 } from "../lib/ipc";
+import { nextSort, type SortDir, type SortKey } from "../lib/sortEntries";
 import {
   emptyHistory,
   type History,
@@ -27,6 +28,8 @@ interface TabState {
   selectedPath: string | null;
   loading: boolean;
   filterQuery: string; // reset to "" by load()
+  sortKey: SortKey; // NOT reset by load(); inherited by addTab()
+  sortDir: SortDir;
 }
 
 export type EditingState =
@@ -43,7 +46,11 @@ interface ExplorerState {
 
 let nextTabId = 1;
 
-function makeTab(path: string): TabState {
+function makeTab(
+  path: string,
+  sortKey: SortKey = "name",
+  sortDir: SortDir = "asc",
+): TabState {
   return {
     id: nextTabId++,
     currentPath: path,
@@ -52,6 +59,8 @@ function makeTab(path: string): TabState {
     selectedPath: null,
     loading: false,
     filterQuery: "",
+    sortKey,
+    sortDir,
   };
 }
 
@@ -210,6 +219,15 @@ export const explorer = {
     updateTab(state.activeTabId, { selectedPath: path });
   },
 
+  setSort(key: SortKey): void {
+    const tab = activeTab();
+    const { key: sortKey, dir: sortDir } = nextSort(
+      { key: tab.sortKey, dir: tab.sortDir },
+      key,
+    );
+    updateTab(tab.id, { sortKey, sortDir });
+  },
+
   setFilter(query: string): void {
     const tab = activeTab();
     const stillMatches =
@@ -281,7 +299,7 @@ export const explorer = {
 
   addTab(): void {
     const current = activeTab();
-    const tab = makeTab(current.currentPath);
+    const tab = makeTab(current.currentPath, current.sortKey, current.sortDir);
     batch(() => {
       setState("tabs", (tabs) => [...tabs, tab]);
       setState("activeTabId", tab.id);

@@ -18,6 +18,19 @@
   font-size: 12px;
 }
 
+.headerButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  justify-content: flex-start;
+}
+
 .list {
   flex: 1;
   overflow-y: auto;

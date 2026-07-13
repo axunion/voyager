@@ -134,7 +134,7 @@ function App() {
                 () => explorer.tab(tabId) ?? explorer.activeTab(),
               );
               const sorted = createMemo(() =>
-                sortEntries(tab().entries, "name", "asc"),
+                sortEntries(tab().entries, tab().sortKey, tab().sortDir),
               );
               const entries = createMemo(() =>
                 filterEntries(sorted(), tab().filterQuery),
@@ -150,6 +150,9 @@ function App() {
                       currentPath={tab().currentPath}
                       selectedPath={tab().selectedPath}
                       editing={visible() ? explorer.state.editing : null}
+                      sortKey={tab().sortKey}
+                      sortDir={tab().sortDir}
+                      onSort={(key) => explorer.setSort(key)}
                       onOpen={handleOpen}
                       onSelect={(entry) => explorer.select(entry.path)}
                       onDropMove={(src, targetDir) =>

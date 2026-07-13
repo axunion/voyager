@@ -1,4 +1,6 @@
 import * as ContextMenu from "@kobalte/core/context-menu";
+import ChevronDown from "lucide-solid/icons/chevron-down";
+import ChevronUp from "lucide-solid/icons/chevron-up";
 import {
   createEffect,
   createSelector,
@@ -15,6 +17,7 @@ import {
 import { iconFor } from "../lib/icons";
 import type { Entry } from "../lib/ipc";
 import { entryAfterMove, rowId } from "../lib/listNav";
+import type { SortDir, SortKey } from "../lib/sortEntries";
 import type { EditingState } from "../store/explorer";
 import { FileItem } from "./FileItem";
 import itemStyles from "./FileItem.module.css";
@@ -25,6 +28,9 @@ interface FileListProps {
   currentPath: string;
   selectedPath: string | null;
   editing: EditingState;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort(key: SortKey): void;
   onOpen(entry: Entry): void;
   onSelect(entry: Entry): void;
   onDropMove(sourcePath: string, targetDirPath: string): void;
@@ -37,6 +43,17 @@ interface FileListProps {
   onCancelEdit(): void;
 }
 
+const HEADERS: { key: SortKey; label: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "size", label: "Size" },
+  { key: "mtime", label: "Modified" },
+];
+
+const ARIA_SORT: Record<SortDir, "ascending" | "descending"> = {
+  asc: "ascending",
+  desc: "descending",
+};
+
 // Dumb renderer: data comes in via props only, so the <For> below can be
 // swapped for a virtualizer without touching the store.
 export function FileList(props: FileListProps) {
@@ -45,6 +62,7 @@ export function FileList(props: FileListProps) {
   const isRenaming = createSelector(() =>
     props.editing?.mode === "rename" ? props.editing.path : null,
   );
+  const isActiveSort = createSelector(() => props.sortKey);
 
   // Any open context menu (blank-area or row) suspends the container's own
   // arrow-key navigation, since Kobalte's menu highlight uses the same keys.
@@ -135,9 +153,30 @@ export function FileList(props: FileListProps) {
   return (
     <div class={styles.container}>
       <div class={styles.header}>
-        <span>Name</span>
-        <span>Size</span>
-        <span>Modified</span>
+        <For each={HEADERS}>
+          {(header) => (
+            // biome-ignore lint/a11y/useSemanticElements: header is a CSS grid row, not a table; role="columnheader" on the button keeps aria-sort valid while staying keyboard-clickable
+            <button
+              type="button"
+              role="columnheader"
+              class={styles.headerButton}
+              aria-sort={
+                isActiveSort(header.key) ? ARIA_SORT[props.sortDir] : undefined
+              }
+              onClick={() => props.onSort(header.key)}
+            >
+              {header.label}
+              <Show when={isActiveSort(header.key)}>
+                <Show
+                  when={props.sortDir === "asc"}
+                  fallback={<ChevronDown size={12} />}
+                >
+                  <ChevronUp size={12} />
+                </Show>
+              </Show>
+            </button>
+          )}
+        </For>
       </div>
       <ContextMenu.Root onOpenChange={setMenuOpen}>
         <ContextMenu.Trigger

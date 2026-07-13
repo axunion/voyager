@@ -17,6 +17,25 @@ function valueForKey(entry: Entry, key: SortKey): number | null {
   return null;
 }
 
+const defaultDirForKey: Record<SortKey, SortDir> = {
+  name: "asc",
+  size: "desc",
+  mtime: "desc",
+};
+
+// Applies the header-click rules: clicking the active key toggles its
+// direction; clicking a different key switches to it with that key's
+// default direction (name: asc, size/mtime: desc).
+export function nextSort(
+  current: { key: SortKey; dir: SortDir },
+  clicked: SortKey,
+): { key: SortKey; dir: SortDir } {
+  if (current.key === clicked) {
+    return { key: clicked, dir: current.dir === "asc" ? "desc" : "asc" };
+  }
+  return { key: clicked, dir: defaultDirForKey[clicked] };
+}
+
 // Pure. Always dirs-first regardless of key/dir. Within each group:
 // - name: case-insensitive name compare (current Rust order)
 // - size: dirs stay name-asc (their size is null); files by size
