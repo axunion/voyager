@@ -6,6 +6,9 @@ const entry = (name: string): Entry => ({
   name,
   path: `/${name}`,
   is_dir: false,
+  is_symlink: false,
+  size: null,
+  mtime: null,
 });
 
 const entries: Entry[] = [

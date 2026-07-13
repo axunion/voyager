@@ -18,18 +18,26 @@ describe("extensionOf", () => {
 });
 
 describe("iconFor", () => {
+  const base = { is_symlink: false, size: null, mtime: null };
+
   it("maps directories to Folder regardless of name", () => {
-    expect(iconFor({ name: "src.txt", path: "/x", is_dir: true })).toBe(Folder);
+    expect(
+      iconFor({ name: "src.txt", path: "/x", is_dir: true, ...base }),
+    ).toBe(Folder);
   });
 
   it("maps known extensions case-insensitively", () => {
-    expect(iconFor({ name: "a.TXT", path: "/x", is_dir: false })).toBe(
+    expect(iconFor({ name: "a.TXT", path: "/x", is_dir: false, ...base })).toBe(
       FileText,
     );
   });
 
   it("falls back to File for unknown or missing extensions", () => {
-    expect(iconFor({ name: "a.xyz", path: "/x", is_dir: false })).toBe(File);
-    expect(iconFor({ name: "Makefile", path: "/x", is_dir: false })).toBe(File);
+    expect(iconFor({ name: "a.xyz", path: "/x", is_dir: false, ...base })).toBe(
+      File,
+    );
+    expect(
+      iconFor({ name: "Makefile", path: "/x", is_dir: false, ...base }),
+    ).toBe(File);
   });
 });

@@ -17,6 +17,7 @@ import { Toolbar } from "./components/Toolbar";
 import { isDragActive } from "./lib/dnd";
 import { filterEntries } from "./lib/filterEntries";
 import type { Entry } from "./lib/ipc";
+import { sortEntries } from "./lib/sortEntries";
 import { explorer } from "./store/explorer";
 import { renderedTabIds } from "./store/tabs";
 import { tree } from "./store/tree";
@@ -132,8 +133,11 @@ function App() {
               const tab = createMemo(
                 () => explorer.tab(tabId) ?? explorer.activeTab(),
               );
+              const sorted = createMemo(() =>
+                sortEntries(tab().entries, "name", "asc"),
+              );
               const entries = createMemo(() =>
-                filterEntries(tab().entries, tab().filterQuery),
+                filterEntries(sorted(), tab().filterQuery),
               );
               return (
                 <div class="file-pane" classList={{ hidden: !visible() }}>

@@ -5,6 +5,9 @@ pub struct Entry {
     pub name: String,
     pub path: String,
     pub is_dir: bool,
+    pub is_symlink: bool,
+    pub size: Option<u64>,
+    pub mtime: Option<i64>,
 }
 
 #[tauri::command]
@@ -22,15 +25,35 @@ pub fn read_directory(path: String) -> Result<Vec<Entry>, String> {
             let p = de.path();
             // file_type() is free (readdir metadata); stat only for symlinks so
             // a symlink to a directory still lists as a folder.
-            let is_dir = match de.file_type() {
-                Ok(ft) if ft.is_symlink() => p.is_dir(),
-                Ok(ft) => ft.is_dir(),
-                Err(_) => p.is_dir(),
+            let file_type = de.file_type();
+            let is_symlink = matches!(&file_type, Ok(ft) if ft.is_symlink());
+            let is_dir = if is_symlink {
+                p.is_dir()
+            } else {
+                file_type
+                    .map(|ft| ft.is_dir())
+                    .unwrap_or_else(|_| p.is_dir())
             };
+            // lstat (does not follow symlinks): a symlink to a file reports
+            // the link's own size, which is an intentional trade-off.
+            let metadata = de.metadata().ok();
+            let size = if is_dir {
+                None
+            } else {
+                metadata.as_ref().map(|m| m.len())
+            };
+            let mtime = metadata.as_ref().and_then(|m| m.modified().ok()).map(|t| {
+                t.duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or_else(|e| -(e.duration().as_secs() as i64))
+            });
             Some(Entry {
                 is_dir,
+                is_symlink,
                 path: p.to_string_lossy().into_owned(),
                 name,
+                size,
+                mtime,
             })
         })
         .collect();
@@ -178,6 +201,43 @@ mod tests {
     fn read_directory_nonexistent_path_errors_with_path() {
         let err = read_directory("/nonexistent-voyager-test".into()).unwrap_err();
         assert!(err.contains("/nonexistent-voyager-test"));
+    }
+
+    #[test]
+    fn read_directory_reports_file_size_and_mtime() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(tmp.path().join("data.txt"), b"hello world").unwrap();
+
+        let entries = read_directory(tmp.path().to_string_lossy().into_owned()).unwrap();
+        let entry = entries.iter().find(|e| e.name == "data.txt").unwrap();
+        assert_eq!(entry.size, Some(11));
+        assert!(entry.mtime.is_some());
+    }
+
+    #[test]
+    fn read_directory_directory_size_is_none() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::create_dir(tmp.path().join("sub")).unwrap();
+
+        let entries = read_directory(tmp.path().to_string_lossy().into_owned()).unwrap();
+        let entry = entries.iter().find(|e| e.name == "sub").unwrap();
+        assert_eq!(entry.size, None);
+        assert!(entry.mtime.is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_directory_marks_symlinks() {
+        let tmp = tempfile::tempdir().unwrap();
+        touch(&tmp.path().join("real.txt"));
+        std::os::unix::fs::symlink(tmp.path().join("real.txt"), tmp.path().join("link.txt"))
+            .unwrap();
+
+        let entries = read_directory(tmp.path().to_string_lossy().into_owned()).unwrap();
+        let real = entries.iter().find(|e| e.name == "real.txt").unwrap();
+        let link = entries.iter().find(|e| e.name == "link.txt").unwrap();
+        assert!(!real.is_symlink);
+        assert!(link.is_symlink);
     }
 
     #[test]

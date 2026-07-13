@@ -1,3 +1,23 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: var(--file-row-columns);
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--muted-color);
+  font-size: 12px;
+}
+
 .list {
   flex: 1;
   overflow-y: auto;

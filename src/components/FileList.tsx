@@ -133,78 +133,88 @@ export function FileList(props: FileListProps) {
   };
 
   return (
-    <ContextMenu.Root onOpenChange={setMenuOpen}>
-      <ContextMenu.Trigger
-        as="div"
-        ref={containerRef}
-        class={styles.list}
-        classList={{ [styles.dropTarget]: backgroundDropTarget.dragOver() }}
-        role="listbox"
-        tabIndex="0"
-        aria-activedescendant={
-          props.selectedPath ? rowId(props.selectedPath) : undefined
-        }
-        onKeyDown={handleKeyDown}
-        onDragOver={handleContainerDragOver}
-        onDragEnter={handleContainerDragEnter}
-        onDragLeave={backgroundDropTarget.onDragLeave}
-        onDrop={handleContainerDrop}
-      >
-        <For each={props.entries}>
-          {(entry) => (
-            <FileItem
-              entry={entry}
-              selected={isSelected(entry.path)}
-              editing={isRenaming(entry.path)}
-              onOpen={props.onOpen}
-              onSelect={props.onSelect}
-              onDropMove={props.onDropMove}
-              onTrash={props.onTrash}
-              onRename={props.onRename}
-              onCommitRename={props.onCommitRename}
-              onCancelEdit={props.onCancelEdit}
-              onMenuOpenChange={setMenuOpen}
-            />
-          )}
-        </For>
-        <Show when={props.editing?.mode === "create" && props.editing}>
-          {(editing) => (
-            <div class={styles.phantomRow}>
-              <Dynamic
-                component={iconFor({
-                  name: "",
-                  path: "",
-                  is_dir: editing().isDir,
-                })}
-                size={16}
-                class={itemStyles.icon}
+    <div class={styles.container}>
+      <div class={styles.header}>
+        <span>Name</span>
+        <span>Size</span>
+        <span>Modified</span>
+      </div>
+      <ContextMenu.Root onOpenChange={setMenuOpen}>
+        <ContextMenu.Trigger
+          as="div"
+          ref={containerRef}
+          class={styles.list}
+          classList={{ [styles.dropTarget]: backgroundDropTarget.dragOver() }}
+          role="listbox"
+          tabIndex="0"
+          aria-activedescendant={
+            props.selectedPath ? rowId(props.selectedPath) : undefined
+          }
+          onKeyDown={handleKeyDown}
+          onDragOver={handleContainerDragOver}
+          onDragEnter={handleContainerDragEnter}
+          onDragLeave={backgroundDropTarget.onDragLeave}
+          onDrop={handleContainerDrop}
+        >
+          <For each={props.entries}>
+            {(entry) => (
+              <FileItem
+                entry={entry}
+                selected={isSelected(entry.path)}
+                editing={isRenaming(entry.path)}
+                onOpen={props.onOpen}
+                onSelect={props.onSelect}
+                onDropMove={props.onDropMove}
+                onTrash={props.onTrash}
+                onRename={props.onRename}
+                onCommitRename={props.onCommitRename}
+                onCancelEdit={props.onCancelEdit}
+                onMenuOpenChange={setMenuOpen}
               />
-              <input
-                ref={phantomInputRef}
-                class={itemStyles.nameInput}
-                onKeyDown={handlePhantomKeyDown}
-                onBlur={handlePhantomBlur}
-              />
-            </div>
-          )}
-        </Show>
-      </ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content class={itemStyles.menu}>
-          <ContextMenu.Item
-            class={itemStyles.menuItem}
-            onSelect={() => props.onNewFolder()}
-          >
-            New Folder
-          </ContextMenu.Item>
-          <ContextMenu.Item
-            class={itemStyles.menuItem}
-            onSelect={() => props.onNewFile()}
-          >
-            New File
-          </ContextMenu.Item>
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
-    </ContextMenu.Root>
+            )}
+          </For>
+          <Show when={props.editing?.mode === "create" && props.editing}>
+            {(editing) => (
+              <div class={styles.phantomRow}>
+                <Dynamic
+                  component={iconFor({
+                    name: "",
+                    path: "",
+                    is_dir: editing().isDir,
+                    is_symlink: false,
+                    size: null,
+                    mtime: null,
+                  })}
+                  size={16}
+                  class={itemStyles.icon}
+                />
+                <input
+                  ref={phantomInputRef}
+                  class={itemStyles.nameInput}
+                  onKeyDown={handlePhantomKeyDown}
+                  onBlur={handlePhantomBlur}
+                />
+              </div>
+            )}
+          </Show>
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content class={itemStyles.menu}>
+            <ContextMenu.Item
+              class={itemStyles.menuItem}
+              onSelect={() => props.onNewFolder()}
+            >
+              New Folder
+            </ContextMenu.Item>
+            <ContextMenu.Item
+              class={itemStyles.menuItem}
+              onSelect={() => props.onNewFile()}
+            >
+              New File
+            </ContextMenu.Item>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
+    </div>
   );
 }

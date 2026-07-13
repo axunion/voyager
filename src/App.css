@@ -7,6 +7,8 @@
   --menu-bg: #ffffff;
   --error-bg: #fdecea;
   --error-color: #b3261e;
+  /* Shared by FileList's header row and FileItem's rows so columns align. */
+  --file-row-columns: minmax(0, 1fr) 6rem 10rem;
 
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 14px;

@@ -4,6 +4,9 @@ export interface Entry {
   name: string;
   path: string;
   is_dir: boolean;
+  is_symlink: boolean;
+  size: number | null;
+  mtime: number | null;
 }
 
 export const readDirectory = (path: string) =>

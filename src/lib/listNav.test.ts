@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { Entry } from "./ipc";
 import { entryAfterMove } from "./listNav";
 
+const base = { is_symlink: false, size: null, mtime: null };
+
 const entries: Entry[] = [
-  { name: "a", path: "/a", is_dir: false },
-  { name: "b", path: "/b", is_dir: false },
-  { name: "c", path: "/c", is_dir: false },
+  { name: "a", path: "/a", is_dir: false, ...base },
+  { name: "b", path: "/b", is_dir: false, ...base },
+  { name: "c", path: "/c", is_dir: false, ...base },
 ];
 
 describe("entryAfterMove", () => {

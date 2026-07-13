@@ -1,4 +1,5 @@
 import * as ContextMenu from "@kobalte/core/context-menu";
+import Link2 from "lucide-solid/icons/link-2";
 import { createEffect, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import {
@@ -7,6 +8,8 @@ import {
   readVoyagerPath,
   startVoyagerDrag,
 } from "../lib/dnd";
+import { formatMtime } from "../lib/formatMtime";
+import { formatSize } from "../lib/formatSize";
 import { iconFor } from "../lib/icons";
 import type { Entry } from "../lib/ipc";
 import { rowId } from "../lib/listNav";
@@ -102,23 +105,36 @@ export function FileItem(props: FileItemProps) {
           props.onSelect(props.entry);
         }}
       >
-        <Dynamic
-          component={iconFor(props.entry)}
-          size={16}
-          class={styles.icon}
-        />
-        <Show
-          when={props.editing}
-          fallback={<span class={styles.name}>{props.entry.name}</span>}
-        >
-          <input
-            ref={inputRef}
-            class={styles.nameInput}
-            value={props.entry.name}
-            onKeyDown={handleInputKeyDown}
-            onBlur={handleInputBlur}
+        <div class={styles.nameCell}>
+          <Dynamic
+            component={iconFor(props.entry)}
+            size={16}
+            class={styles.icon}
           />
-        </Show>
+          <Show
+            when={props.editing}
+            fallback={
+              <>
+                <span class={styles.name}>{props.entry.name}</span>
+                <Show when={props.entry.is_symlink}>
+                  <span class={styles.symlinkBadge} title="Symbolic link">
+                    <Link2 size={12} />
+                  </span>
+                </Show>
+              </>
+            }
+          >
+            <input
+              ref={inputRef}
+              class={styles.nameInput}
+              value={props.entry.name}
+              onKeyDown={handleInputKeyDown}
+              onBlur={handleInputBlur}
+            />
+          </Show>
+        </div>
+        <span class={styles.size}>{formatSize(props.entry.size)}</span>
+        <span class={styles.mtime}>{formatMtime(props.entry.mtime)}</span>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content class={styles.menu}>

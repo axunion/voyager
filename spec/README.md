@@ -20,7 +20,7 @@ spec 01–08, 11(開く挙動 / タブ / キーボードナビ / ツリー / フ
 | --- | --- | --- | --- | --- |
 | 09 | [OS drop-in](09-dnd-os-drop.md) — OS からのドロップ受け入れ | 中 | 保留 | macOS で `dragDropEnabled: true` によりアプリ内 D&D が機能しなくなる回帰を確認、フォールバック(a)を選択し取り下げ |
 | 10 | [Drag-out](10-dnd-drag-out.md) — OS へのドラッグアウト | — | **保留** | ロードマップ外(調査記録) |
-| 12 | [Entry metadata](12-entry-metadata.md) — サイズ・更新日時カラム + symlink 表示 | 中 | 未着手 | 正規導出パイプライン(sort → filter)を確立 |
+| 12 | [Entry metadata](12-entry-metadata.md) — サイズ・更新日時カラム + symlink 表示 | 中 | 完了 | 正規導出パイプライン(sort → filter)を確立 |
 | 13 | [Sort columns](13-sort-columns.md) — カラムヘッダでソート切替 | 小 | 未着手 | |
 | 14 | [Hidden files](14-hidden-files.md) — 隠しファイル表示トグル | 小 | 未着手 | |
 | 15 | [Multi-select](15-multi-select.md) — 複数選択 | 大 | 未着手 | 12–14 と入替自由(独立トラック) |
