@@ -1,5 +1,7 @@
 import ArrowLeft from "lucide-solid/icons/arrow-left";
 import ArrowRight from "lucide-solid/icons/arrow-right";
+import Eye from "lucide-solid/icons/eye";
+import EyeOff from "lucide-solid/icons/eye-off";
 import { PathBar } from "./PathBar";
 import styles from "./Toolbar.module.css";
 
@@ -12,6 +14,8 @@ interface ToolbarProps {
   onNavigate(path: string): void;
   filterQuery: string;
   onFilterChange(query: string): void;
+  showHidden: boolean;
+  onToggleHidden(): void;
 }
 
 export function Toolbar(props: ToolbarProps) {
@@ -42,6 +46,17 @@ export function Toolbar(props: ToolbarProps) {
         aria-label="Forward"
       >
         <ArrowRight size={16} />
+      </button>
+      <button
+        type="button"
+        class={styles.navButton}
+        onClick={() => props.onToggleHidden()}
+        aria-label={
+          props.showHidden ? "Hide hidden files" : "Show hidden files"
+        }
+        aria-pressed={props.showHidden}
+      >
+        {props.showHidden ? <Eye size={16} /> : <EyeOff size={16} />}
       </button>
       <PathBar currentPath={props.currentPath} onNavigate={props.onNavigate} />
       <input

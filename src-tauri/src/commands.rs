@@ -11,7 +11,7 @@ pub struct Entry {
 }
 
 #[tauri::command]
-pub fn read_directory(path: String) -> Result<Vec<Entry>, String> {
+pub fn read_directory(path: String, include_hidden: bool) -> Result<Vec<Entry>, String> {
     let dir = std::fs::read_dir(&path).map_err(|e| format!("Cannot read \"{path}\": {e}"))?;
     let mut entries: Vec<Entry> = dir
         .filter_map(|res| res.ok())
@@ -19,7 +19,7 @@ pub fn read_directory(path: String) -> Result<Vec<Entry>, String> {
             let name = de.file_name().to_string_lossy().into_owned();
             // Hidden by cross-platform dotfile convention; Windows attribute-hidden
             // files are intentionally not handled (no OS-specific code).
-            if name.starts_with('.') {
+            if !include_hidden && name.starts_with('.') {
                 return None;
             }
             let p = de.path();
@@ -152,14 +152,8 @@ fn validate_name(name: &str) -> Result<(), String> {
     if name.contains('/') || name.contains('\\') {
         return Err("Name cannot contain path separators".into());
     }
-    // read_directory skips dotfiles, so a created dotfile would silently
-    // disappear from the UI — reject instead of confusing the user.
-    if name.starts_with('.') {
-        return Err(if name == "." || name == ".." {
-            "Invalid name".into()
-        } else {
-            format!("\"{name}\" would be hidden")
-        });
+    if name == "." || name == ".." {
+        return Err("Invalid name".into());
     }
     Ok(())
 }
@@ -181,7 +175,7 @@ mod tests {
         touch(&tmp.path().join("beta.txt"));
         touch(&tmp.path().join("Apple.txt"));
 
-        let entries = read_directory(tmp.path().to_string_lossy().into_owned()).unwrap();
+        let entries = read_directory(tmp.path().to_string_lossy().into_owned(), false).unwrap();
         let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(names, ["Alpha", "zeta", "Apple.txt", "beta.txt"]);
     }
@@ -192,14 +186,25 @@ mod tests {
         touch(&tmp.path().join(".hidden"));
         touch(&tmp.path().join("visible.txt"));
 
-        let entries = read_directory(tmp.path().to_string_lossy().into_owned()).unwrap();
+        let entries = read_directory(tmp.path().to_string_lossy().into_owned(), false).unwrap();
         let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(names, ["visible.txt"]);
     }
 
     #[test]
+    fn read_directory_includes_dotfiles_when_asked() {
+        let tmp = tempfile::tempdir().unwrap();
+        touch(&tmp.path().join(".hidden"));
+        touch(&tmp.path().join("visible.txt"));
+
+        let entries = read_directory(tmp.path().to_string_lossy().into_owned(), true).unwrap();
+        let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, [".hidden", "visible.txt"]);
+    }
+
+    #[test]
     fn read_directory_nonexistent_path_errors_with_path() {
-        let err = read_directory("/nonexistent-voyager-test".into()).unwrap_err();
+        let err = read_directory("/nonexistent-voyager-test".into(), false).unwrap_err();
         assert!(err.contains("/nonexistent-voyager-test"));
     }
 
@@ -208,7 +213,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         fs::write(tmp.path().join("data.txt"), b"hello world").unwrap();
 
-        let entries = read_directory(tmp.path().to_string_lossy().into_owned()).unwrap();
+        let entries = read_directory(tmp.path().to_string_lossy().into_owned(), false).unwrap();
         let entry = entries.iter().find(|e| e.name == "data.txt").unwrap();
         assert_eq!(entry.size, Some(11));
         assert!(entry.mtime.is_some());
@@ -219,7 +224,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         fs::create_dir(tmp.path().join("sub")).unwrap();
 
-        let entries = read_directory(tmp.path().to_string_lossy().into_owned()).unwrap();
+        let entries = read_directory(tmp.path().to_string_lossy().into_owned(), false).unwrap();
         let entry = entries.iter().find(|e| e.name == "sub").unwrap();
         assert_eq!(entry.size, None);
         assert!(entry.mtime.is_some());
@@ -233,7 +238,7 @@ mod tests {
         std::os::unix::fs::symlink(tmp.path().join("real.txt"), tmp.path().join("link.txt"))
             .unwrap();
 
-        let entries = read_directory(tmp.path().to_string_lossy().into_owned()).unwrap();
+        let entries = read_directory(tmp.path().to_string_lossy().into_owned(), false).unwrap();
         let real = entries.iter().find(|e| e.name == "real.txt").unwrap();
         let link = entries.iter().find(|e| e.name == "link.txt").unwrap();
         assert!(!real.is_symlink);
@@ -366,15 +371,15 @@ mod tests {
     }
 
     #[test]
-    fn create_entry_leading_dot_errors() {
+    fn create_entry_leading_dot_succeeds() {
         let tmp = tempfile::tempdir().unwrap();
-        let err = create_entry(
+        let path = create_entry(
             tmp.path().to_string_lossy().into_owned(),
             ".hidden".into(),
             false,
         )
-        .unwrap_err();
-        assert!(err.contains("would be hidden"));
+        .unwrap();
+        assert!(Path::new(&path).is_file());
     }
 
     #[test]

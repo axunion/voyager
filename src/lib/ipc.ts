@@ -9,8 +9,8 @@ export interface Entry {
   mtime: number | null;
 }
 
-export const readDirectory = (path: string) =>
-  invoke<Entry[]>("read_directory", { path });
+export const readDirectory = (path: string, includeHidden: boolean) =>
+  invoke<Entry[]>("read_directory", { path, includeHidden });
 
 export const moveEntry = (source: string, targetDir: string) =>
   invoke<string>("move_entry", { source, targetDir });

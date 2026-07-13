@@ -11,6 +11,7 @@ import {
   renameEntry,
 } from "../lib/ipc";
 import { nextSort, type SortDir, type SortKey } from "../lib/sortEntries";
+import { hiddenNameError } from "../lib/validateVisibleName";
 import {
   emptyHistory,
   type History,
@@ -18,6 +19,7 @@ import {
   stepBack,
   stepForward,
 } from "./history";
+import { settings } from "./settings";
 import { nextActiveTabId } from "./tabs";
 
 interface TabState {
@@ -122,7 +124,7 @@ async function load(
     clearEditing();
   });
   try {
-    const entries = await readDirectory(path);
+    const entries = await readDirectory(path, settings.showHidden());
     if (loadSeq.get(tabId) !== seq) return false;
     return updateTab(tabId, {
       currentPath: path,
@@ -163,14 +165,25 @@ async function mutateAndReload(
   }
 }
 
-// Shared by commitRename/commitCreate: runs the IPC call, reloads `path`
-// selecting the new entry, and always ends the edit session (on error too,
-// per spec: the edit ends and the banner shows).
+// Shared by commitRename/commitCreate: guards against creating/renaming to a
+// name that would be hidden under the current setting (no IPC call in that
+// case), then runs the IPC call, reloads `path` selecting the new entry, and
+// always ends the edit session (on error too, per spec: the edit ends and
+// the banner shows).
 async function commitEdit(
   tabId: number,
   path: string,
+  name: string,
   action: () => Promise<string>,
 ): Promise<void> {
+  const error = hiddenNameError(name, settings.showHidden());
+  if (error) {
+    batch(() => {
+      setState("error", error);
+      clearEditing();
+    });
+    return;
+  }
   try {
     const newPath = await action();
     await load(tabId, path, newPath);
@@ -203,6 +216,12 @@ export const explorer = {
     if (await load(tab.id, path)) {
       updateTab(tab.id, { history: pushPath(prevHistory, prevPath) });
     }
+  },
+
+  // Reloads every tab's currentPath concurrently (existing load(); loadSeq
+  // guards make overlapping loads safe). Used by the hidden-files toggle.
+  async reloadAllTabs(): Promise<void> {
+    await Promise.all(state.tabs.map((t) => load(t.id, t.currentPath)));
   },
 
   goBack(): Promise<void> {
@@ -269,7 +288,7 @@ export const explorer = {
     const tabId = state.activeTabId;
     const tab = findTab(tabId);
     if (!tab) return Promise.resolve();
-    return commitEdit(tabId, tab.currentPath, () =>
+    return commitEdit(tabId, tab.currentPath, newName, () =>
       renameEntry(editing.path, newName),
     );
   },
@@ -281,7 +300,7 @@ export const explorer = {
     const tab = findTab(tabId);
     if (!tab) return Promise.resolve();
     const parent = tab.currentPath;
-    return commitEdit(tabId, parent, () =>
+    return commitEdit(tabId, parent, name, () =>
       createEntry(parent, name, editing.isDir),
     );
   },

@@ -19,6 +19,7 @@ import { filterEntries } from "./lib/filterEntries";
 import type { Entry } from "./lib/ipc";
 import { sortEntries } from "./lib/sortEntries";
 import { explorer } from "./store/explorer";
+import { settings } from "./store/settings";
 import { renderedTabIds } from "./store/tabs";
 import { tree } from "./store/tree";
 import "./App.css";
@@ -53,6 +54,9 @@ function App() {
         } else if (key === "w") {
           e.preventDefault();
           explorer.closeTab(explorer.state.activeTabId);
+        } else if (e.shiftKey && e.code === "Period") {
+          e.preventDefault();
+          toggleHidden();
         }
       } else if (e.altKey) {
         if (e.key === "ArrowLeft") {
@@ -67,6 +71,12 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
   });
+
+  const toggleHidden = () => {
+    settings.toggleShowHidden();
+    explorer.reloadAllTabs();
+    tree.refreshExpanded();
+  };
 
   const handleOpen = (entry: Entry) => {
     if (entry.is_dir) {
@@ -95,6 +105,8 @@ function App() {
         onNavigate={(p) => explorer.navigateTo(p)}
         filterQuery={explorer.activeTab().filterQuery}
         onFilterChange={(q) => explorer.setFilter(q)}
+        showHidden={settings.showHidden()}
+        onToggleHidden={toggleHidden}
       />
       <Show when={explorer.state.error}>
         <div class="error-banner" role="alert">
