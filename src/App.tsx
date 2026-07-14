@@ -78,11 +78,17 @@ function App() {
     tree.refreshExpanded();
   };
 
-  const handleOpen = (entry: Entry) => {
-    if (entry.is_dir) {
-      explorer.navigateTo(entry.path);
-    } else {
-      openPath(entry.path).catch((e) => explorer.setError(String(e)));
+  const handleOpen = (entries: Entry[]) => {
+    if (entries.length === 1 && entries[0].is_dir) {
+      explorer.navigateTo(entries[0].path);
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.is_dir) {
+        explorer.addTab(entry.path);
+      } else {
+        openPath(entry.path).catch((e) => explorer.setError(String(e)));
+      }
     }
   };
 
@@ -94,7 +100,9 @@ function App() {
         onActivate={(id) => explorer.activateTab(id)}
         onClose={(id) => explorer.closeTab(id)}
         onAdd={() => explorer.addTab()}
-        onDropMove={(src, targetDir) => explorer.moveIntoFolder(src, targetDir)}
+        onDropMove={(paths, targetDir) =>
+          explorer.moveIntoFolder(paths, targetDir)
+        }
       />
       <Toolbar
         currentPath={explorer.activeTab().currentPath}
@@ -129,8 +137,8 @@ function App() {
           currentPath={explorer.activeTab().currentPath}
           onToggle={(path) => tree.toggle(path)}
           onNavigate={(path) => explorer.navigateTo(path)}
-          onDropMove={(src, targetDir) =>
-            explorer.moveIntoFolder(src, targetDir)
+          onDropMove={(paths, targetDir) =>
+            explorer.moveIntoFolder(paths, targetDir)
           }
         />
         <div
@@ -160,17 +168,19 @@ function App() {
                     <FileList
                       entries={entries()}
                       currentPath={tab().currentPath}
-                      selectedPath={tab().selectedPath}
+                      selectedPaths={tab().selectedPaths}
+                      anchor={tab().selectionAnchor}
+                      cursor={tab().selectionCursor}
                       editing={visible() ? explorer.state.editing : null}
                       sortKey={tab().sortKey}
                       sortDir={tab().sortDir}
                       onSort={(key) => explorer.setSort(key)}
                       onOpen={handleOpen}
-                      onSelect={(entry) => explorer.select(entry.path)}
-                      onDropMove={(src, targetDir) =>
-                        explorer.moveIntoFolder(src, targetDir)
+                      onSelectionChange={(sel) => explorer.setSelection(sel)}
+                      onDropMove={(paths, targetDir) =>
+                        explorer.moveIntoFolder(paths, targetDir)
                       }
-                      onTrash={(entry) => explorer.trashEntry(entry.path)}
+                      onTrash={(paths) => explorer.trashEntries(paths)}
                       onRename={(entry) => explorer.startRename(entry.path)}
                       onNewFolder={() => explorer.startCreate(true)}
                       onNewFile={() => explorer.startCreate(false)}

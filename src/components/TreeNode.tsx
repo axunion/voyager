@@ -4,7 +4,7 @@ import { For, Show } from "solid-js";
 import {
   acceptsVoyagerDrag,
   createDragOverTarget,
-  readVoyagerPath,
+  readVoyagerPaths,
 } from "../lib/dnd";
 import type { Entry } from "../lib/ipc";
 import styles from "./Sidebar.module.css";
@@ -18,7 +18,7 @@ interface TreeNodeProps {
   isSelected(path: string): boolean;
   onToggle(path: string): void;
   onNavigate(path: string): void;
-  onDropMove(sourcePath: string, targetDirPath: string): void;
+  onDropMove(sourcePaths: string[], targetDirPath: string): void;
 }
 
 // Recursive: a node renders its own row plus, when expanded, one TreeNode
@@ -30,10 +30,8 @@ export function TreeNode(props: TreeNodeProps) {
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     dropTarget.clear();
-    const source = readVoyagerPath(e);
-    if (source && source !== props.entry.path) {
-      props.onDropMove(source, props.entry.path);
-    }
+    const sources = readVoyagerPaths(e);
+    if (sources.length > 0) props.onDropMove(sources, props.entry.path);
   };
 
   return (

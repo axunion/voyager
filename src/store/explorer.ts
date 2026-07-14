@@ -10,6 +10,7 @@ import {
   readDirectory,
   renameEntry,
 } from "../lib/ipc";
+import { pruneSelection, type Selection } from "../lib/selection";
 import { nextSort, type SortDir, type SortKey } from "../lib/sortEntries";
 import { hiddenNameError } from "../lib/validateVisibleName";
 import {
@@ -27,7 +28,9 @@ interface TabState {
   currentPath: string;
   entries: Entry[];
   history: History;
-  selectedPath: string | null;
+  selectedPaths: string[]; // kept in visible-list order
+  selectionAnchor: string | null; // range-select origin
+  selectionCursor: string | null; // keyboard focus row → aria-activedescendant
   loading: boolean;
   filterQuery: string; // reset to "" by load()
   sortKey: SortKey; // NOT reset by load(); inherited by addTab()
@@ -58,7 +61,9 @@ function makeTab(
     currentPath: path,
     entries: [],
     history: emptyHistory,
-    selectedPath: null,
+    selectedPaths: [],
+    selectionAnchor: null,
+    selectionCursor: null,
     loading: false,
     filterQuery: "",
     sortKey,
@@ -129,7 +134,9 @@ async function load(
     return updateTab(tabId, {
       currentPath: path,
       entries,
-      selectedPath,
+      selectedPaths: selectedPath ? [selectedPath] : [],
+      selectionAnchor: selectedPath,
+      selectionCursor: selectedPath,
       loading: false,
       filterQuery: "",
     });
@@ -152,17 +159,27 @@ async function navigateHistory(
   }
 }
 
-async function mutateAndReload(
+// Runs `action` for each item in sequence, stopping at the first failure but
+// still reloading once afterward so already-applied changes are visible; a
+// failure surfaces as the error banner after that reload (load() itself
+// clears the error, so this must be set last).
+async function sequentialReload(
   tabId: number,
-  action: () => Promise<unknown>,
+  items: string[],
+  action: (item: string) => Promise<unknown>,
 ): Promise<void> {
-  try {
-    await action();
-    const tab = findTab(tabId);
-    if (tab) await load(tabId, tab.currentPath);
-  } catch (e) {
-    setState("error", String(e));
+  let error: string | null = null;
+  for (const item of items) {
+    try {
+      await action(item);
+    } catch (e) {
+      error = String(e);
+      break;
+    }
   }
+  const tab = findTab(tabId);
+  if (tab) await load(tabId, tab.currentPath);
+  if (error) setState("error", error);
 }
 
 // Shared by commitRename/commitCreate: guards against creating/renaming to a
@@ -235,7 +252,19 @@ export const explorer = {
   },
 
   select(path: string): void {
-    updateTab(state.activeTabId, { selectedPath: path });
+    updateTab(state.activeTabId, {
+      selectedPaths: [path],
+      selectionAnchor: path,
+      selectionCursor: path,
+    });
+  },
+
+  setSelection(sel: Selection): void {
+    updateTab(state.activeTabId, {
+      selectedPaths: sel.paths,
+      selectionAnchor: sel.anchor,
+      selectionCursor: sel.cursor,
+    });
   },
 
   setSort(key: SortKey): void {
@@ -249,25 +278,37 @@ export const explorer = {
 
   setFilter(query: string): void {
     const tab = activeTab();
-    const stillMatches =
-      tab.selectedPath !== null &&
-      tab.entries.some(
-        (e) => e.path === tab.selectedPath && matchesQuery(e, query),
-      );
+    const visible = tab.entries.filter((e) => matchesQuery(e, query));
+    const pruned = pruneSelection(
+      {
+        paths: tab.selectedPaths,
+        anchor: tab.selectionAnchor,
+        cursor: tab.selectionCursor,
+      },
+      visible,
+    );
     updateTab(tab.id, {
       filterQuery: query,
-      selectedPath: stillMatches ? tab.selectedPath : null,
+      selectedPaths: pruned.paths,
+      selectionAnchor: pruned.anchor,
+      selectionCursor: pruned.cursor,
     });
   },
 
-  moveIntoFolder(source: string, targetDir: string): Promise<void> {
-    return mutateAndReload(state.activeTabId, () =>
+  // Sequential, stop on first error, reload once. Filters out sources whose
+  // path equals targetDir (a folder can't be moved into itself).
+  moveIntoFolder(sources: string[], targetDir: string): Promise<void> {
+    const filtered = sources.filter((s) => s !== targetDir);
+    return sequentialReload(state.activeTabId, filtered, (source) =>
       moveEntry(source, targetDir),
     );
   },
 
-  trashEntry(path: string): Promise<void> {
-    return mutateAndReload(state.activeTabId, () => moveToTrash(path));
+  // Sequential, stop on first error, reload once.
+  trashEntries(paths: string[]): Promise<void> {
+    return sequentialReload(state.activeTabId, paths, (path) =>
+      moveToTrash(path),
+    );
   },
 
   startRename(path: string): void {
@@ -316,9 +357,13 @@ export const explorer = {
   canGoBack: () => activeTab().history.back.length > 0,
   canGoForward: () => activeTab().history.forward.length > 0,
 
-  addTab(): void {
+  addTab(path?: string): void {
     const current = activeTab();
-    const tab = makeTab(current.currentPath, current.sortKey, current.sortDir);
+    const tab = makeTab(
+      path ?? current.currentPath,
+      current.sortKey,
+      current.sortDir,
+    );
     batch(() => {
       setState("tabs", (tabs) => [...tabs, tab]);
       setState("activeTabId", tab.id);

@@ -5,7 +5,7 @@ import {
   acceptsVoyagerDrag,
   createDragOverTarget,
   isDragActive,
-  readVoyagerPath,
+  readVoyagerPaths,
 } from "../lib/dnd";
 import { basename } from "../store/tabs";
 import styles from "./TabBar.module.css";
@@ -21,7 +21,7 @@ interface TabBarProps {
   onActivate(id: number): void;
   onClose(id: number): void;
   onAdd(): void;
-  onDropMove(sourcePath: string, targetDirPath: string): void;
+  onDropMove(sourcePaths: string[], targetDirPath: string): void;
 }
 
 // Hovering a file drag over an inactive tab this long auto-switches to it.
@@ -35,7 +35,7 @@ function TabItem(props: {
   showClose: boolean;
   onActivate(id: number): void;
   onClose(id: number): void;
-  onDropMove(sourcePath: string, targetDirPath: string): void;
+  onDropMove(sourcePaths: string[], targetDirPath: string): void;
 }) {
   const dropTarget = createDragOverTarget(acceptsVoyagerDrag);
   const label = () => basename(props.tab.currentPath);
@@ -76,12 +76,12 @@ function TabItem(props: {
     e.preventDefault();
     clearHoverTimer();
     dropTarget.clear();
-    const source = readVoyagerPath(e);
-    if (!source) return;
+    const sources = readVoyagerPaths(e);
+    if (sources.length === 0) return;
     // Handles a drop that beat the hover timer (< 600ms): switch and move
     // together. Safe synchronously now for the same reason as the timer.
     if (!props.active) props.onActivate(props.tab.id);
-    props.onDropMove(source, props.tab.currentPath);
+    props.onDropMove(sources, props.tab.currentPath);
   };
 
   return (

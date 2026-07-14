@@ -37,11 +37,17 @@
 .selected,
 .selected:hover {
   background: var(--selected-bg);
+  border-radius: 0;
 }
 
 .dropTarget,
 .dropTarget:hover {
   background: var(--drop-bg);
+}
+
+.cursor {
+  outline: 1px solid var(--border-color);
+  outline-offset: -1px;
 }
 
 .icon {

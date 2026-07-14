@@ -5,8 +5,7 @@ import { Dynamic } from "solid-js/web";
 import {
   acceptsVoyagerDrag,
   createDragOverTarget,
-  readVoyagerPath,
-  startVoyagerDrag,
+  readVoyagerPaths,
 } from "../lib/dnd";
 import { formatMtime } from "../lib/formatMtime";
 import { formatSize } from "../lib/formatSize";
@@ -18,12 +17,18 @@ import styles from "./FileItem.module.css";
 interface FileItemProps {
   entry: Entry;
   selected: boolean;
+  isCursor: boolean;
   editing: boolean;
-  onOpen(entry: Entry): void;
+  canRename: boolean;
+  onOpen(): void;
   onSelect(entry: Entry): void;
-  onDropMove(sourcePath: string, targetDirPath: string): void;
-  onTrash(entry: Entry): void;
-  onRename(entry: Entry): void;
+  onToggleSelect(entry: Entry): void;
+  onRangeSelect(entry: Entry): void;
+  onContextMenuSelect(entry: Entry): void;
+  onDragStart(entry: Entry, e: DragEvent): void;
+  onDropMove(sourcePaths: string[], targetDirPath: string): void;
+  onTrash(): void;
+  onRename(): void;
   onCommitRename(name: string): void;
   onCancelEdit(): void;
   onMenuOpenChange(open: boolean): void;
@@ -57,10 +62,6 @@ export function FileItem(props: FileItemProps) {
     props.onCommitRename((e.currentTarget as HTMLInputElement).value);
   };
 
-  const handleDragStart = (e: DragEvent) => {
-    startVoyagerDrag(e, props.entry.path);
-  };
-
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     // Stops this from also reaching FileList's own background drop target
@@ -68,14 +69,18 @@ export function FileItem(props: FileItemProps) {
     // drop).
     e.stopPropagation();
     dropTarget.clear();
-    const source = readVoyagerPath(e);
-    if (source && source !== props.entry.path) {
-      props.onDropMove(source, props.entry.path);
-    }
+    const sources = readVoyagerPaths(e);
+    if (sources.length > 0) props.onDropMove(sources, props.entry.path);
   };
 
-  const handleClick = () => {
-    props.onSelect(props.entry);
+  const handleClick = (e: MouseEvent) => {
+    if (e.shiftKey) {
+      props.onRangeSelect(props.entry);
+    } else if (e.metaKey || e.ctrlKey) {
+      props.onToggleSelect(props.entry);
+    } else {
+      props.onSelect(props.entry);
+    }
   };
 
   return (
@@ -88,21 +93,22 @@ export function FileItem(props: FileItemProps) {
         class={styles.row}
         classList={{
           [styles.selected]: props.selected,
+          [styles.cursor]: props.isCursor,
           [styles.dropTarget]: dropTarget.dragOver(),
         }}
         draggable={!props.editing}
-        onDragStart={handleDragStart}
+        onDragStart={(e: DragEvent) => props.onDragStart(props.entry, e)}
         onDragOver={dropTarget.onDragOver}
         onDragEnter={dropTarget.onDragEnter}
         onDragLeave={dropTarget.onDragLeave}
         onDrop={handleDrop}
         onClick={handleClick}
         onDblClick={() => {
-          if (!props.editing) props.onOpen(props.entry);
+          if (!props.editing) props.onOpen();
         }}
         onContextMenu={(e: MouseEvent) => {
           e.stopPropagation();
-          props.onSelect(props.entry);
+          props.onContextMenuSelect(props.entry);
         }}
       >
         <div class={styles.nameCell}>
@@ -140,19 +146,21 @@ export function FileItem(props: FileItemProps) {
         <ContextMenu.Content class={styles.menu}>
           <ContextMenu.Item
             class={styles.menuItem}
-            onSelect={() => props.onOpen(props.entry)}
+            onSelect={() => props.onOpen()}
           >
             Open
           </ContextMenu.Item>
+          <Show when={props.canRename}>
+            <ContextMenu.Item
+              class={styles.menuItem}
+              onSelect={() => props.onRename()}
+            >
+              Rename
+            </ContextMenu.Item>
+          </Show>
           <ContextMenu.Item
             class={styles.menuItem}
-            onSelect={() => props.onRename(props.entry)}
-          >
-            Rename
-          </ContextMenu.Item>
-          <ContextMenu.Item
-            class={styles.menuItem}
-            onSelect={() => props.onTrash(props.entry)}
+            onSelect={() => props.onTrash()}
           >
             Move to Trash
           </ContextMenu.Item>

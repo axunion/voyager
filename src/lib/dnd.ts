@@ -10,8 +10,18 @@ export function acceptsVoyagerDrag(e: DragEvent): boolean {
 }
 
 // Usable in drop handlers, once the payload becomes readable.
-export function readVoyagerPath(e: DragEvent): string | null {
-  return e.dataTransfer?.getData(DRAG_TYPE) || null;
+export function readVoyagerPaths(e: DragEvent): string[] {
+  const raw = e.dataTransfer?.getData(DRAG_TYPE);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((p) => typeof p === "string")) {
+      return parsed;
+    }
+    return [];
+  } catch {
+    return [];
+  }
 }
 
 // Tracks whether a voyager-origin drag is currently in progress, app-wide.
@@ -32,9 +42,9 @@ if (typeof document !== "undefined") {
 }
 
 // Sets the drag payload on dragstart.
-export function startVoyagerDrag(e: DragEvent, path: string): void {
+export function startVoyagerDrag(e: DragEvent, paths: string[]): void {
   if (!e.dataTransfer) return;
-  e.dataTransfer.setData(DRAG_TYPE, path);
+  e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(paths));
   e.dataTransfer.effectAllowed = "move";
   setDragActive(true);
 }

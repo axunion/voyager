@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acceptsVoyagerDrag, DRAG_TYPE, readVoyagerPath } from "./dnd";
+import { acceptsVoyagerDrag, DRAG_TYPE, readVoyagerPaths } from "./dnd";
 
 function stubEvent(dataTransfer: Partial<DataTransfer> | null): DragEvent {
   return { dataTransfer } as unknown as DragEvent;
@@ -21,18 +21,33 @@ describe("acceptsVoyagerDrag", () => {
   });
 });
 
-describe("readVoyagerPath", () => {
-  it("returns the path when getData yields a value", () => {
-    const e = stubEvent({ getData: () => "/some/path" });
-    expect(readVoyagerPath(e)).toBe("/some/path");
+describe("readVoyagerPaths", () => {
+  it("round-trips an array of paths through JSON", () => {
+    const e = stubEvent({ getData: () => JSON.stringify(["/a", "/b"]) });
+    expect(readVoyagerPaths(e)).toEqual(["/a", "/b"]);
   });
 
-  it("returns null when getData yields an empty string", () => {
+  it("returns an empty array for an empty payload", () => {
+    const e = stubEvent({ getData: () => JSON.stringify([]) });
+    expect(readVoyagerPaths(e)).toEqual([]);
+  });
+
+  it("returns an empty array when getData yields an empty string", () => {
     const e = stubEvent({ getData: () => "" });
-    expect(readVoyagerPath(e)).toBeNull();
+    expect(readVoyagerPaths(e)).toEqual([]);
   });
 
-  it("returns null when dataTransfer is null", () => {
-    expect(readVoyagerPath(stubEvent(null))).toBeNull();
+  it("returns an empty array when dataTransfer is null", () => {
+    expect(readVoyagerPaths(stubEvent(null))).toEqual([]);
+  });
+
+  it("returns an empty array for a non-JSON legacy single-path payload", () => {
+    const e = stubEvent({ getData: () => "/some/path" });
+    expect(readVoyagerPaths(e)).toEqual([]);
+  });
+
+  it("returns an empty array for JSON that isn't an array of strings", () => {
+    const e = stubEvent({ getData: () => JSON.stringify({ a: 1 }) });
+    expect(readVoyagerPaths(e)).toEqual([]);
   });
 });
