@@ -50,6 +50,10 @@
   outline-offset: -1px;
 }
 
+.cut {
+  opacity: 0.5;
+}
+
 .icon {
   flex-shrink: 0;
   color: var(--muted-color);

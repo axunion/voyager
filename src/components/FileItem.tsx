@@ -18,6 +18,7 @@ interface FileItemProps {
   entry: Entry;
   selected: boolean;
   isCursor: boolean;
+  isCut: boolean;
   editing: boolean;
   canRename: boolean;
   onOpen(): void;
@@ -29,6 +30,8 @@ interface FileItemProps {
   onDropMove(sourcePaths: string[], targetDirPath: string): void;
   onTrash(): void;
   onRename(): void;
+  onCopy(): void;
+  onCut(): void;
   onCommitRename(name: string): void;
   onCancelEdit(): void;
   onMenuOpenChange(open: boolean): void;
@@ -94,6 +97,7 @@ export function FileItem(props: FileItemProps) {
         classList={{
           [styles.selected]: props.selected,
           [styles.cursor]: props.isCursor,
+          [styles.cut]: props.isCut,
           [styles.dropTarget]: dropTarget.dragOver(),
         }}
         draggable={!props.editing}
@@ -158,6 +162,18 @@ export function FileItem(props: FileItemProps) {
               Rename
             </ContextMenu.Item>
           </Show>
+          <ContextMenu.Item
+            class={styles.menuItem}
+            onSelect={() => props.onCopy()}
+          >
+            Copy
+          </ContextMenu.Item>
+          <ContextMenu.Item
+            class={styles.menuItem}
+            onSelect={() => props.onCut()}
+          >
+            Cut
+          </ContextMenu.Item>
           <ContextMenu.Item
             class={styles.menuItem}
             onSelect={() => props.onTrash()}

@@ -7,6 +7,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::read_directory,
             commands::move_entry,
+            commands::copy_entry,
             commands::move_to_trash,
             commands::rename_entry,
             commands::create_entry

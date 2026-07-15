@@ -3,6 +3,7 @@ import { batch } from "solid-js";
 import { createStore } from "solid-js/store";
 import { matchesQuery } from "../lib/filterEntries";
 import {
+  copyEntry,
   createEntry,
   type Entry,
   moveEntry,
@@ -13,6 +14,7 @@ import {
 import { pruneSelection, type Selection } from "../lib/selection";
 import { nextSort, type SortDir, type SortKey } from "../lib/sortEntries";
 import { hiddenNameError } from "../lib/validateVisibleName";
+import { clipboard } from "./clipboard";
 import {
   emptyHistory,
   type History,
@@ -162,12 +164,13 @@ async function navigateHistory(
 // Runs `action` for each item in sequence, stopping at the first failure but
 // still reloading once afterward so already-applied changes are visible; a
 // failure surfaces as the error banner after that reload (load() itself
-// clears the error, so this must be set last).
+// clears the error, so this must be set last). Resolves to whether every
+// item succeeded, so callers can act on full-success without re-reading state.
 async function sequentialReload(
   tabId: number,
   items: string[],
   action: (item: string) => Promise<unknown>,
-): Promise<void> {
+): Promise<boolean> {
   let error: string | null = null;
   for (const item of items) {
     try {
@@ -180,6 +183,7 @@ async function sequentialReload(
   const tab = findTab(tabId);
   if (tab) await load(tabId, tab.currentPath);
   if (error) setState("error", error);
+  return error === null;
 }
 
 // Shared by commitRename/commitCreate: guards against creating/renaming to a
@@ -297,18 +301,41 @@ export const explorer = {
 
   // Sequential, stop on first error, reload once. Filters out sources whose
   // path equals targetDir (a folder can't be moved into itself).
-  moveIntoFolder(sources: string[], targetDir: string): Promise<void> {
+  async moveIntoFolder(sources: string[], targetDir: string): Promise<void> {
     const filtered = sources.filter((s) => s !== targetDir);
-    return sequentialReload(state.activeTabId, filtered, (source) =>
+    await sequentialReload(state.activeTabId, filtered, (source) =>
       moveEntry(source, targetDir),
     );
   },
 
   // Sequential, stop on first error, reload once.
-  trashEntries(paths: string[]): Promise<void> {
-    return sequentialReload(state.activeTabId, paths, (path) =>
+  async trashEntries(paths: string[]): Promise<void> {
+    await sequentialReload(state.activeTabId, paths, (path) =>
       moveToTrash(path),
     );
+  },
+
+  copySelection(): void {
+    clipboard.set(activeTab().selectedPaths, "copy");
+  },
+
+  cutSelection(): void {
+    clipboard.set(activeTab().selectedPaths, "cut");
+  },
+
+  // Sequential copy_entry/move_entry into the active tab's currentPath, stop
+  // on first error, reload once. Clears the clipboard only after a fully
+  // successful cut-paste (copy stays repeatable; a failed cut stays retryable).
+  async paste(): Promise<void> {
+    const current = clipboard.content();
+    if (!current) return;
+    const { paths, mode } = current;
+    const targetDir = activeTab().currentPath;
+    const ipcCall = mode === "copy" ? copyEntry : moveEntry;
+    const succeeded = await sequentialReload(state.activeTabId, paths, (path) =>
+      ipcCall(path, targetDir),
+    );
+    if (mode === "cut" && succeeded) clipboard.clear();
   },
 
   startRename(path: string): void {

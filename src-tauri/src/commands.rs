@@ -94,6 +94,62 @@ pub fn move_entry(source: String, target_dir: String) -> Result<String, String> 
     Ok(dest.to_string_lossy().into_owned())
 }
 
+/// Copies `source` into `target_dir`, keeping its file name. Directories are
+/// copied recursively. Returns the new path.
+#[tauri::command]
+pub fn copy_entry(source: String, target_dir: String) -> Result<String, String> {
+    let src = Path::new(&source);
+    let metadata =
+        std::fs::metadata(src).map_err(|e| format!("Cannot access \"{source}\": {e}"))?;
+    let name = src
+        .file_name()
+        .ok_or_else(|| format!("Invalid source path: {source}"))?;
+    let is_dir = metadata.is_dir();
+    // Self-nesting is only possible when copying a directory, so pay for the
+    // canonicalize-based containment check (symlink-safe) only in that case.
+    if is_dir {
+        let src_real = src
+            .canonicalize()
+            .map_err(|e| format!("Cannot access \"{source}\": {e}"))?;
+        let target_real = Path::new(&target_dir)
+            .canonicalize()
+            .map_err(|e| format!("Cannot access \"{target_dir}\": {e}"))?;
+        if target_real.starts_with(&src_real) {
+            return Err("Cannot copy a folder into itself".into());
+        }
+    }
+    let dest = Path::new(&target_dir).join(name);
+    if dest.exists() {
+        return Err(format!(
+            "\"{}\" already exists in the destination",
+            name.to_string_lossy()
+        ));
+    }
+    if is_dir {
+        copy_dir_recursive(src, &dest).map_err(|e| format!("Failed to copy: {e}"))?;
+    } else {
+        std::fs::copy(src, &dest).map_err(|e| format!("Failed to copy: {e}"))?;
+    }
+    Ok(dest.to_string_lossy().into_owned())
+}
+
+/// Recursively copies the contents of `src` into a newly-created `dest` directory.
+/// Symlinks are followed by `fs::copy`/`fs::create_dir`, so a copied symlink
+/// becomes a real file or directory holding the target's contents.
+fn copy_dir_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {
+    std::fs::create_dir(dest)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let dest_child = dest.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&entry.path(), &dest_child)?;
+        } else {
+            std::fs::copy(entry.path(), &dest_child)?;
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn move_to_trash(path: String) -> Result<(), String> {
     trash::delete(&path).map_err(|e| format!("Failed to move to trash: {e}"))
@@ -297,6 +353,97 @@ mod tests {
 
         assert_eq!(err, "Cannot move a folder into itself");
         assert!(sub.exists());
+    }
+
+    #[test]
+    fn copy_entry_copies_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("a.txt");
+        fs::write(&src, b"hello").unwrap();
+        let target = tmp.path().join("sub");
+        fs::create_dir(&target).unwrap();
+
+        let new_path = copy_entry(
+            src.to_string_lossy().into_owned(),
+            target.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+
+        assert!(src.exists());
+        assert_eq!(Path::new(&new_path), target.join("a.txt"));
+        assert_eq!(fs::read(&new_path).unwrap(), b"hello");
+    }
+
+    #[test]
+    fn copy_entry_copies_directory_recursively() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("src_dir");
+        fs::create_dir(&src).unwrap();
+        fs::create_dir(src.join("nested")).unwrap();
+        fs::write(src.join("nested").join("file.txt"), b"content").unwrap();
+        let target = tmp.path().join("target_dir");
+        fs::create_dir(&target).unwrap();
+
+        let new_path = copy_entry(
+            src.to_string_lossy().into_owned(),
+            target.to_string_lossy().into_owned(),
+        )
+        .unwrap();
+
+        assert!(src.exists());
+        let copied_file = Path::new(&new_path).join("nested").join("file.txt");
+        assert_eq!(fs::read(&copied_file).unwrap(), b"content");
+    }
+
+    #[test]
+    fn copy_entry_collision_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("b.txt");
+        touch(&src);
+        let target = tmp.path().join("sub");
+        fs::create_dir(&target).unwrap();
+        touch(&target.join("b.txt"));
+
+        let err = copy_entry(
+            src.to_string_lossy().into_owned(),
+            target.to_string_lossy().into_owned(),
+        )
+        .unwrap_err();
+
+        assert!(err.contains("already exists"));
+    }
+
+    #[test]
+    fn copy_entry_folder_into_itself_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let sub = tmp.path().join("sub");
+        fs::create_dir(&sub).unwrap();
+
+        let err = copy_entry(
+            sub.to_string_lossy().into_owned(),
+            sub.to_string_lossy().into_owned(),
+        )
+        .unwrap_err();
+
+        assert_eq!(err, "Cannot copy a folder into itself");
+    }
+
+    #[test]
+    fn copy_entry_missing_source_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target = tmp.path().join("sub");
+        fs::create_dir(&target).unwrap();
+
+        let err = copy_entry(
+            tmp.path()
+                .join("nonexistent")
+                .to_string_lossy()
+                .into_owned(),
+            target.to_string_lossy().into_owned(),
+        )
+        .unwrap_err();
+
+        assert!(err.contains("Cannot access"));
     }
 
     #[test]

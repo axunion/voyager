@@ -15,6 +15,9 @@ export const readDirectory = (path: string, includeHidden: boolean) =>
 export const moveEntry = (source: string, targetDir: string) =>
   invoke<string>("move_entry", { source, targetDir });
 
+export const copyEntry = (source: string, targetDir: string) =>
+  invoke<string>("copy_entry", { source, targetDir });
+
 export const moveToTrash = (path: string) =>
   invoke<void>("move_to_trash", { path });
 

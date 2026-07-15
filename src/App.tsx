@@ -18,6 +18,7 @@ import { isDragActive } from "./lib/dnd";
 import { filterEntries } from "./lib/filterEntries";
 import type { Entry } from "./lib/ipc";
 import { sortEntries } from "./lib/sortEntries";
+import { clipboard } from "./store/clipboard";
 import { explorer } from "./store/explorer";
 import { settings } from "./store/settings";
 import { renderedTabIds } from "./store/tabs";
@@ -71,6 +72,11 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
   });
+
+  const cutPaths = () => {
+    const current = clipboard.content();
+    return current?.mode === "cut" ? current.paths : [];
+  };
 
   const toggleHidden = () => {
     settings.toggleShowHidden();
@@ -174,6 +180,8 @@ function App() {
                       editing={visible() ? explorer.state.editing : null}
                       sortKey={tab().sortKey}
                       sortDir={tab().sortDir}
+                      cutPaths={cutPaths()}
+                      canPaste={clipboard.content() !== null}
                       onSort={(key) => explorer.setSort(key)}
                       onOpen={handleOpen}
                       onSelectionChange={(sel) => explorer.setSelection(sel)}
@@ -187,6 +195,9 @@ function App() {
                       onCommitRename={(name) => explorer.commitRename(name)}
                       onCommitCreate={(name) => explorer.commitCreate(name)}
                       onCancelEdit={() => explorer.cancelEdit()}
+                      onCopy={() => explorer.copySelection()}
+                      onCut={() => explorer.cutSelection()}
+                      onPaste={() => explorer.paste()}
                     />
                   </Show>
                 </div>

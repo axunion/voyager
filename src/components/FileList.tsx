@@ -45,6 +45,8 @@ interface FileListProps {
   editing: EditingState;
   sortKey: SortKey;
   sortDir: SortDir;
+  cutPaths: string[];
+  canPaste: boolean;
   onSort(key: SortKey): void;
   onOpen(entries: Entry[]): void;
   onSelectionChange(sel: Selection): void;
@@ -56,6 +58,9 @@ interface FileListProps {
   onCommitRename(name: string): void;
   onCommitCreate(name: string): void;
   onCancelEdit(): void;
+  onCopy(): void;
+  onCut(): void;
+  onPaste(): void;
 }
 
 const HEADERS: { key: SortKey; label: string }[] = [
@@ -89,6 +94,10 @@ export function FileList(props: FileListProps) {
     (path, paths) => paths.has(path),
   );
   const isCursor = createSelector(() => props.cursor);
+  const cutPathSet = createMemo(() => new Set(props.cutPaths));
+  const isCut = createSelector<Set<string>, string>(cutPathSet, (path, paths) =>
+    paths.has(path),
+  );
   const isRenaming = createSelector(() =>
     props.editing?.mode === "rename" ? props.editing.path : null,
   );
@@ -300,6 +309,21 @@ export function FileList(props: FileListProps) {
       props.onSelectionChange(selectAll(props.entries));
       return;
     }
+    if (mod && e.key.toLowerCase() === "c") {
+      e.preventDefault();
+      props.onCopy();
+      return;
+    }
+    if (mod && e.key.toLowerCase() === "x") {
+      e.preventDefault();
+      props.onCut();
+      return;
+    }
+    if (mod && e.key.toLowerCase() === "v") {
+      e.preventDefault();
+      props.onPaste();
+      return;
+    }
     if (e.key === "Escape") {
       e.preventDefault();
       props.onSelectionChange(emptySelection);
@@ -439,6 +463,7 @@ export function FileList(props: FileListProps) {
                 entry={entry}
                 selected={isSelected(entry.path)}
                 isCursor={isCursor(entry.path)}
+                isCut={isCut(entry.path)}
                 editing={isRenaming(entry.path)}
                 canRename={props.selectedPaths.length === 1}
                 onOpen={handleOpenSelection}
@@ -450,6 +475,8 @@ export function FileList(props: FileListProps) {
                 onDropMove={props.onDropMove}
                 onTrash={handleTrashSelection}
                 onRename={handleRenameSelection}
+                onCopy={props.onCopy}
+                onCut={props.onCut}
                 onCommitRename={props.onCommitRename}
                 onCancelEdit={props.onCancelEdit}
                 onMenuOpenChange={setMenuOpen}
@@ -494,6 +521,13 @@ export function FileList(props: FileListProps) {
               onSelect={() => props.onNewFile()}
             >
               New File
+            </ContextMenu.Item>
+            <ContextMenu.Item
+              class={itemStyles.menuItem}
+              disabled={!props.canPaste}
+              onSelect={() => props.onPaste()}
+            >
+              Paste
             </ContextMenu.Item>
           </ContextMenu.Content>
         </ContextMenu.Portal>
