@@ -43,4 +43,17 @@ describe("entryAfterMove", () => {
     expect(entryAfterMove(entries, "/missing", 1)).toEqual(entries[0]);
     expect(entryAfterMove(entries, "/missing", -1)).toBeNull();
   });
+
+  it("clamps a large forward delta to the last entry", () => {
+    expect(entryAfterMove(entries, "/a", 10)).toEqual(entries[2]);
+  });
+
+  it("clamps a large backward delta to the first entry", () => {
+    expect(entryAfterMove(entries, "/c", -10)).toEqual(entries[0]);
+  });
+
+  it("returns null when a large delta clamps to the already-current entry", () => {
+    expect(entryAfterMove(entries, "/c", 10)).toBeNull();
+    expect(entryAfterMove(entries, "/a", -10)).toBeNull();
+  });
 });

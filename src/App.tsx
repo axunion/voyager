@@ -17,6 +17,8 @@ import { Toolbar } from "./components/Toolbar";
 import { isDragActive } from "./lib/dnd";
 import { filterEntries } from "./lib/filterEntries";
 import type { Entry } from "./lib/ipc";
+import { parentPath } from "./lib/pathSegments";
+import { matchGlobalShortcut, type ShortcutInput } from "./lib/shortcuts";
 import { sortEntries } from "./lib/sortEntries";
 import { clipboard } from "./store/clipboard";
 import { explorer } from "./store/explorer";
@@ -42,31 +44,87 @@ function App() {
     }
   });
 
+  let filterInputRef: HTMLInputElement | undefined;
+
+  const cycleTab = (delta: 1 | -1) => {
+    const tabs = explorer.state.tabs;
+    const currentIndex = tabs.findIndex(
+      (t) => t.id === explorer.state.activeTabId,
+    );
+    const nextIndex = (currentIndex + delta + tabs.length) % tabs.length;
+    explorer.activateTab(tabs[nextIndex].id);
+  };
+
   onMount(() => {
     explorer.init();
     tree.init();
 
+    const toShortcutInput = (e: KeyboardEvent): ShortcutInput => {
+      const target = e.target as HTMLElement | null;
+      return {
+        // e.code is used for the period key since Shift+Period reports e.key
+        // as ">" on a US layout, which would otherwise miss Mod+Shift+..
+        key: e.code === "Period" ? "." : e.key,
+        metaKey: e.metaKey,
+        ctrlKey: e.ctrlKey,
+        shiftKey: e.shiftKey,
+        altKey: e.altKey,
+        targetIsTextInput:
+          target?.tagName === "INPUT" || target?.tagName === "TEXTAREA",
+      };
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey) {
-        const key = e.key.toLowerCase();
-        if (key === "t") {
-          e.preventDefault();
+      // Every binding requires a modifier, so skip building a ShortcutInput
+      // (and its DOM tagName read) for the vast majority of keystrokes, e.g.
+      // plain typing in the filter box or a rename input.
+      if (!e.metaKey && !e.ctrlKey && !e.altKey) return;
+      const action = matchGlobalShortcut(toShortcutInput(e));
+      if (!action) return;
+      e.preventDefault();
+      switch (action.type) {
+        case "new-tab":
           explorer.addTab();
-        } else if (key === "w") {
-          e.preventDefault();
+          break;
+        case "close-tab":
           explorer.closeTab(explorer.state.activeTabId);
-        } else if (e.shiftKey && e.code === "Period") {
-          e.preventDefault();
-          toggleHidden();
-        }
-      } else if (e.altKey) {
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
+          break;
+        case "back":
           explorer.goBack();
-        } else if (e.key === "ArrowRight") {
-          e.preventDefault();
+          break;
+        case "forward":
           explorer.goForward();
+          break;
+        case "toggle-hidden":
+          toggleHidden();
+          break;
+        case "activate-tab": {
+          const tabs = explorer.state.tabs;
+          const target =
+            action.index === -1 ? tabs[tabs.length - 1] : tabs[action.index];
+          if (target) explorer.activateTab(target.id);
+          break;
         }
+        case "next-tab":
+          cycleTab(1);
+          break;
+        case "prev-tab":
+          cycleTab(-1);
+          break;
+        case "refresh":
+          explorer.refresh();
+          break;
+        case "new-folder":
+          explorer.startCreate(true);
+          break;
+        case "parent-dir": {
+          const parent = parentPath(explorer.activeTab().currentPath);
+          if (parent) explorer.navigateTo(parent);
+          break;
+        }
+        case "focus-filter":
+          filterInputRef?.focus();
+          break;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -119,6 +177,9 @@ function App() {
         onNavigate={(p) => explorer.navigateTo(p)}
         filterQuery={explorer.activeTab().filterQuery}
         onFilterChange={(q) => explorer.setFilter(q)}
+        onFilterInputRef={(el) => {
+          filterInputRef = el;
+        }}
         showHidden={settings.showHidden()}
         onToggleHidden={toggleHidden}
       />

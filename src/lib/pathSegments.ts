@@ -19,3 +19,10 @@ export function splitPathSegments(path: string): PathSegment[] {
   }
   return segments;
 }
+
+// "/a/b/c" → "/a/b", "/a" → "/", "/" → null (already at root). POSIX only.
+// Trailing slash tolerated: "/a/b/" behaves like "/a/b".
+export function parentPath(path: string): string | null {
+  const segments = splitPathSegments(path);
+  return segments.length <= 1 ? null : segments[segments.length - 2].path;
+}

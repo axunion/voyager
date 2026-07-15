@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitPathSegments } from "./pathSegments";
+import { parentPath, splitPathSegments } from "./pathSegments";
 
 describe("splitPathSegments", () => {
   it("splits a normal absolute path into root + each component", () => {
@@ -28,5 +28,23 @@ describe("splitPathSegments", () => {
       { name: "/", path: "/" },
       { name: "Users", path: "/Users" },
     ]);
+  });
+});
+
+describe("parentPath", () => {
+  it("returns the parent of a multi-level path", () => {
+    expect(parentPath("/a/b/c")).toBe("/a/b");
+  });
+
+  it("returns root for a single-level path", () => {
+    expect(parentPath("/a")).toBe("/");
+  });
+
+  it("returns null for the root", () => {
+    expect(parentPath("/")).toBeNull();
+  });
+
+  it("tolerates a trailing slash", () => {
+    expect(parentPath("/a/b/")).toBe(parentPath("/a/b"));
   });
 });

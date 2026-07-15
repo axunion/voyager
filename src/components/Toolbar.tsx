@@ -14,6 +14,7 @@ interface ToolbarProps {
   onNavigate(path: string): void;
   filterQuery: string;
   onFilterChange(query: string): void;
+  onFilterInputRef(el: HTMLInputElement): void;
   showHidden: boolean;
   onToggleHidden(): void;
 }
@@ -60,6 +61,7 @@ export function Toolbar(props: ToolbarProps) {
       </button>
       <PathBar currentPath={props.currentPath} onNavigate={props.onNavigate} />
       <input
+        ref={props.onFilterInputRef}
         type="text"
         class={styles.filterInput}
         placeholder="Filter"

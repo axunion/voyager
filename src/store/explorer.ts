@@ -114,13 +114,16 @@ function updateTab(id: number, patch: Partial<TabState>): boolean {
 // corrupt another tab's path/history.
 const loadSeq = new Map<number, number>();
 
-// On failure keeps the previous listing and path so the user stays where they were.
-// `selectedPath` defaults to null (fresh listing, nothing selected); callers
-// that just created/renamed an entry pass its new path to select it in one commit.
-async function load(
+// Shared by load()/refreshTab(): bumps `tabId`'s loadSeq token, runs
+// `beforeFetch` (if given) inside the same batch as the loading/error reset,
+// fetches `path`'s entries, and commits `patchFor(entries)` if this call is
+// still the most recent load for the tab. On failure, keeps the previous
+// listing and shows the banner. Returns whether the commit happened.
+async function withLoadGuard(
   tabId: number,
   path: string,
-  selectedPath: string | null = null,
+  patchFor: (entries: Entry[]) => Partial<TabState>,
+  beforeFetch?: () => void,
 ): Promise<boolean> {
   const seq = (loadSeq.get(tabId) ?? 0) + 1;
   loadSeq.set(tabId, seq);
@@ -128,20 +131,12 @@ async function load(
   batch(() => {
     updateTab(tabId, { loading: true });
     setState("error", null);
-    clearEditing();
+    beforeFetch?.();
   });
   try {
     const entries = await readDirectory(path, settings.showHidden());
     if (loadSeq.get(tabId) !== seq) return false;
-    return updateTab(tabId, {
-      currentPath: path,
-      entries,
-      selectedPaths: selectedPath ? [selectedPath] : [],
-      selectionAnchor: selectedPath,
-      selectionCursor: selectedPath,
-      loading: false,
-      filterQuery: "",
-    });
+    return updateTab(tabId, { ...patchFor(entries), loading: false });
   } catch (e) {
     if (loadSeq.get(tabId) !== seq) return false;
     batch(() => {
@@ -150,6 +145,54 @@ async function load(
     });
     return false;
   }
+}
+
+// On failure keeps the previous listing and path so the user stays where they were.
+// `selectedPath` defaults to null (fresh listing, nothing selected); callers
+// that just created/renamed an entry pass its new path to select it in one commit.
+function load(
+  tabId: number,
+  path: string,
+  selectedPath: string | null = null,
+): Promise<boolean> {
+  return withLoadGuard(
+    tabId,
+    path,
+    (entries) => ({
+      currentPath: path,
+      entries,
+      selectedPaths: selectedPath ? [selectedPath] : [],
+      selectionAnchor: selectedPath,
+      selectionCursor: selectedPath,
+      filterQuery: "",
+    }),
+    clearEditing,
+  );
+}
+
+// Reloads `tabId`'s currentPath without the load() resets: filterQuery,
+// sortKey, sortDir are kept, and selection is intersected with the fresh
+// entries. Shares `loadSeq` with load() so only the most recent of either
+// wins. On failure, keeps everything and shows the banner (same as load()).
+function refreshTab(tabId: number): Promise<boolean> {
+  const tab = findTab(tabId);
+  if (!tab) return Promise.resolve(false);
+  return withLoadGuard(tabId, tab.currentPath, (entries) => {
+    const pruned = pruneSelection(
+      {
+        paths: tab.selectedPaths,
+        anchor: tab.selectionAnchor,
+        cursor: tab.selectionCursor,
+      },
+      entries,
+    );
+    return {
+      entries,
+      selectedPaths: pruned.paths,
+      selectionAnchor: pruned.anchor,
+      selectionCursor: pruned.cursor,
+    };
+  });
 }
 
 async function navigateHistory(
@@ -243,6 +286,12 @@ export const explorer = {
   // guards make overlapping loads safe). Used by the hidden-files toggle.
   async reloadAllTabs(): Promise<void> {
     await Promise.all(state.tabs.map((t) => load(t.id, t.currentPath)));
+  },
+
+  // Manual refresh (Mod+R): reloads the active tab without pushing history
+  // and without load()'s filter/selection reset — see refreshTab above.
+  async refresh(): Promise<void> {
+    await refreshTab(state.activeTabId);
   },
 
   goBack(): Promise<void> {

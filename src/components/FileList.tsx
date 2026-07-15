@@ -301,6 +301,23 @@ export function FileList(props: FileListProps) {
     commitOrCancelCreate((e.currentTarget as HTMLInputElement).value);
   };
 
+  // Shared by arrow keys / Home / End / PageUp / PageDown: replaces (or,
+  // Shift-held, range-extends) the selection to `target` and scrolls it into
+  // view.
+  const moveCursorTo = (target: Entry, shiftKey: boolean) => {
+    const sel = shiftKey
+      ? rangeSelect(
+          props.entries,
+          resolveAnchor(props.entries, currentSelection()),
+          target.path,
+        )
+      : replaceSelect(target.path);
+    props.onSelectionChange(sel);
+    containerRef
+      ?.querySelector(`[id="${rowId(target.path)}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  };
+
   const handleKeyDown = (e: KeyboardEvent) => {
     if (menuOpen()) return;
     const mod = e.metaKey || e.ctrlKey;
@@ -336,18 +353,36 @@ export function FileList(props: FileListProps) {
         props.cursor,
         e.key === "ArrowDown" ? 1 : -1,
       );
-      if (!next) return;
-      const sel = e.shiftKey
-        ? rangeSelect(
-            props.entries,
-            resolveAnchor(props.entries, currentSelection()),
-            next.path,
-          )
-        : replaceSelect(next.path);
-      props.onSelectionChange(sel);
-      containerRef
-        ?.querySelector(`[id="${rowId(next.path)}"]`)
-        ?.scrollIntoView({ block: "nearest" });
+      if (next) moveCursorTo(next, e.shiftKey);
+      return;
+    }
+    if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      const target =
+        e.key === "Home"
+          ? props.entries[0]
+          : props.entries[props.entries.length - 1];
+      if (target) moveCursorTo(target, e.shiftKey);
+      return;
+    }
+    if (e.key === "PageUp" || e.key === "PageDown") {
+      e.preventDefault();
+      const pageSize = containerRef
+        ? Math.floor(containerRef.clientHeight / 28)
+        : 1;
+      const next = entryAfterMove(
+        props.entries,
+        props.cursor,
+        e.key === "PageDown" ? pageSize : -pageSize,
+      );
+      if (next) moveCursorTo(next, e.shiftKey);
+      return;
+    }
+    if (e.key === "F2") {
+      if (props.selectedPaths.length === 1) {
+        e.preventDefault();
+        handleRenameSelection();
+      }
       return;
     }
     if (e.key === "Enter" || e.key === "Delete") {
