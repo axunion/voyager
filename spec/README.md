@@ -26,7 +26,7 @@ spec 01–08, 11(開く挙動 / タブ / キーボードナビ / ツリー / フ
 | 15 | [Multi-select](15-multi-select.md) — 複数選択 | 大 | 完了 | 12–14 と入替自由(独立トラック) |
 | 16 | [Clipboard](16-clipboard.md) — アプリ内コピー / カット / ペースト | 中 | 完了 | OS クリップボード非依存 |
 | 17 | [Shortcuts & refresh](17-shortcuts-refresh.md) — ショートカット拡充 + 手動リフレッシュ | 中 | 完了 | |
-| 18 | [Virtualized list](18-virtualized-list.md) — ファイルリストの仮想化 | 中 | 未着手 | 必ず最後 |
+| 18 | [Virtualized list](18-virtualized-list.md) — ファイルリストの仮想化 | 中 | 完了 | 必ず最後 |
 | 19 | [Rubber-band select](19-rubber-band-select.md) — マウス範囲ドラッグ選択 | 小 | 完了 | 15 の追加 spec。FileList の行描画に触るため 18 より前に完了させる |
 
 ステータス値: `未着手` / `実装中` / `完了` / `保留`

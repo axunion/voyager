@@ -14,6 +14,7 @@ import { Dynamic } from "solid-js/web";
 import {
   acceptsVoyagerDrag,
   createDragOverTarget,
+  isDragActive,
   readVoyagerPaths,
   startVoyagerDrag,
 } from "../lib/dnd";
@@ -31,6 +32,7 @@ import {
   toggleSelect,
 } from "../lib/selection";
 import type { SortDir, SortKey } from "../lib/sortEntries";
+import { ensureVisible, type VisibleRange, visibleRange } from "../lib/virtual";
 import type { EditingState } from "../store/explorer";
 import { FileItem } from "./FileItem";
 import itemStyles from "./FileItem.module.css";
@@ -83,8 +85,8 @@ interface RubberBandRect {
   currentY: number;
 }
 
-// Dumb renderer: data comes in via props only, so the <For> below can be
-// swapped for a virtualizer without touching the store.
+// Dumb renderer: data comes in via props only. Rows are windowed (see
+// `range` below) rather than rendering all of props.entries at once.
 export function FileList(props: FileListProps) {
   // O(1) membership check per row; createSelector still limits re-renders to
   // just the rows whose membership actually flipped.
@@ -109,6 +111,64 @@ export function FileList(props: FileListProps) {
 
   let containerRef: HTMLDivElement | undefined;
   let phantomInputRef: HTMLInputElement | undefined;
+
+  const [scrollTop, setScrollTop] = createSignal(0);
+  const [viewportHeight, setViewportHeight] = createSignal(0);
+
+  // Windowing math, frozen while a native drag is in flight: recalculating
+  // it mid-drag can unmount the dragged row's DOM and cancel the drag
+  // session (same reasoning as the hidden-pane trick in spec 11).
+  const range = createMemo<VisibleRange>(
+    (prev) =>
+      isDragActive()
+        ? prev
+        : visibleRange(scrollTop(), viewportHeight(), props.entries.length, 8),
+    visibleRange(0, 0, 0, 8),
+    // visibleRange() returns a fresh object every call; without a value
+    // comparator, unchanged windows would still propagate to downstream
+    // memos (e.g. cursorRowId) on every scroll tick, reintroducing the
+    // per-frame O(n) work windowing exists to avoid.
+    { equals: (a, b) => a.start === b.start && a.end === b.end },
+  );
+
+  createEffect(() => {
+    if (!containerRef) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setViewportHeight(entry.contentRect.height);
+    });
+    observer.observe(containerRef);
+    onCleanup(() => observer.disconnect());
+  });
+
+  // Only set aria-activedescendant when the cursor row is actually rendered
+  // (outside the window, its id doesn't exist in the DOM). Checked against
+  // just the rendered slice (not the full entries array) so this stays
+  // cheap on every cursor move even for large directories.
+  const cursorRowId = createMemo(() => {
+    if (!props.cursor) return undefined;
+    const { start, end } = range();
+    const rendered = props.entries
+      .slice(start, end)
+      .some((e) => e.path === props.cursor);
+    return rendered ? rowId(props.cursor) : undefined;
+  });
+
+  // Keeps a DOM scrollTop write and the `scrollTop` signal in sync, so
+  // `range` reflects the new position on this tick rather than waiting for
+  // the next native scroll event.
+  const commitScrollTop = (value: number) => {
+    if (!containerRef) return;
+    containerRef.scrollTop = value;
+    setScrollTop(value);
+  };
+
+  // Scrolls row `index` into view, if needed.
+  const scrollToIndex = (index: number) => {
+    if (index < 0) return;
+    const next = ensureVisible(scrollTop(), viewportHeight(), index);
+    if (next !== null) commitScrollTop(next);
+  };
 
   const currentSelection = (): Selection => ({
     paths: props.selectedPaths,
@@ -175,8 +235,9 @@ export function FileList(props: FileListProps) {
     if (!containerRef) return;
     const rows = containerRef.querySelectorAll<HTMLElement>('[role="option"]');
     const hits: string[] = [];
+    const { start } = range();
     rows.forEach((rowEl, index) => {
-      const entry = props.entries[index];
+      const entry = props.entries[start + index];
       if (!entry) return;
       const rect = rowEl.getBoundingClientRect();
       const rowTop = rect.top - containerTop + scrollTop;
@@ -273,7 +334,8 @@ export function FileList(props: FileListProps) {
   onCleanup(() => stopTracking?.());
 
   createEffect(() => {
-    if (props.editing?.mode === "create" && phantomInputRef) {
+    if (props.editing?.mode === "create" && phantomInputRef && containerRef) {
+      commitScrollTop(containerRef.scrollHeight - containerRef.clientHeight);
       phantomInputRef.focus();
     }
   });
@@ -313,9 +375,7 @@ export function FileList(props: FileListProps) {
         )
       : replaceSelect(target.path);
     props.onSelectionChange(sel);
-    containerRef
-      ?.querySelector(`[id="${rowId(target.path)}"]`)
-      ?.scrollIntoView({ block: "nearest" });
+    scrollToIndex(props.entries.findIndex((e) => e.path === target.path));
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -472,10 +532,13 @@ export function FileList(props: FileListProps) {
           role="listbox"
           aria-multiselectable="true"
           tabIndex="0"
-          aria-activedescendant={props.cursor ? rowId(props.cursor) : undefined}
+          aria-activedescendant={cursorRowId()}
           onKeyDown={handleKeyDown}
           onClick={handleContainerClick}
           onMouseDown={handleContainerMouseDown}
+          onScroll={(e: Event) =>
+            setScrollTop((e.currentTarget as HTMLDivElement).scrollTop)
+          }
           onDragOver={handleContainerDragOver}
           onDragEnter={handleContainerDragEnter}
           onDragLeave={backgroundDropTarget.onDragLeave}
@@ -492,7 +555,8 @@ export function FileList(props: FileListProps) {
               />
             )}
           </Show>
-          <For each={props.entries}>
+          <div style={{ height: `${range().padTop}px` }} />
+          <For each={props.entries.slice(range().start, range().end)}>
             {(entry) => (
               <FileItem
                 entry={entry}
@@ -518,6 +582,7 @@ export function FileList(props: FileListProps) {
               />
             )}
           </For>
+          <div style={{ height: `${range().padBottom}px` }} />
           <Show when={props.editing?.mode === "create" && props.editing}>
             {(editing) => (
               <div class={styles.phantomRow}>
