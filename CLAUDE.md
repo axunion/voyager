@@ -17,8 +17,8 @@ are permanent constraints, not current limitations:
 - **Lightweight.** No new runtime dependencies unless a spec explicitly
   requires one.
 
-Modern-filer UX (tabs, keyboard shortcuts, mouse, DnD) is in scope and driven
-by the spec roadmap.
+Modern-filer UX (tabs, keyboard shortcuts, mouse, DnD) is in scope; the
+feature roadmap was completed in 2026-07.
 
 ## Architecture
 
@@ -33,8 +33,8 @@ by the spec roadmap.
 ## Conventions
 
 Before modifying anything under `src/` or `src-tauri/`, read
-`spec/00-conventions.md` — the single source of truth for error format, IPC,
-store, component, CSS, and test conventions. Do not restate its content.
+`spec/README.md` — the single source of truth for error format, IPC, store,
+component, CSS, and test conventions. Do not restate its content.
 
 ## Repo invariants
 
@@ -47,13 +47,13 @@ store, component, CSS, and test conventions. Do not restate its content.
 
 ## Feature workflow
 
-- Roadmap features are bounded by their `spec/NN-*.md`: Non-goals are
-  prohibitions, and changes stay within the spec's File changes table.
-- `spec/README.md` is the roadmap index: pick work from its status table and
-  update the status on completion. Completed spec files are deleted (numbers
-  stay as gaps); on-hold specs remain as investigation records.
-- Exception to the English-only rule below: `spec/` prose is written in
-  Japanese (code identifiers, types, and error messages stay English).
+- `spec/README.md` is the only spec document: conventions, implementation
+  history, and investigation notes for on-hold work (OS drop-in, drag-out).
+- For a new feature, write Goal / Non-goals / file changes / acceptance
+  criteria up front and get agreement before implementing. Non-goals are
+  prohibitions; changes stay within the listed files.
+- Exception to the English-only rule below: `spec/README.md` prose is written
+  in Japanese (code identifiers, types, and error messages stay English).
 
 ## Completion gate
 

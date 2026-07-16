@@ -1,60 +1,137 @@
-# Voyager 機能拡張 spec
+# Voyager spec — 実装規約と記録
 
-初期開発が完了した Voyager(Tauri v2 + SolidJS のファイルエクスプローラー)に対する、今後の機能追加の設計書群。各 spec は **AI コーディングエージェントが 1 セッションで実装を完結できる**粒度・精度で書かれている。
+Tauri v2 + SolidJS ファイルエクスプローラー Voyager の設計ドキュメント。機能拡張
+ロードマップ(spec 01–19)は **2026-07 に全実装が完了**し、個別の spec ファイルは
+この 1 ファイルに統合した(過去の spec 本文は git 履歴を参照)。
 
-## 使い方(実装セッションの手順)
+本ファイルの本文は日本語で書く(CLAUDE.md の英語規約に対する合意済み例外。コード
+識別子・型名・パス・エラーメッセージは英語のまま)。
 
-1. 下のステータス表で次に実装する spec を決める(番号順が基本。「入替自由」の注記があるものは順序を変えてよい)
-2. **必ず [`00-conventions.md`](00-conventions.md) を読む**(全 spec 共通の規約・完了条件)
-3. 対象 spec を読み、Prerequisites の依存 spec が「完了」になっていることを確認する
-4. spec の File changes / Acceptance criteria / Test plan に従って実装・検証する
-5. 完了したらこの表のステータスを更新する
+## 実装規約
 
-spec を新規追加する場合は [`_template.md`](_template.md) をコピーし、全セクションを埋めてこの README に登録する。
+`src/` / `src-tauri/` を変更する前に必ず読むこと。完了条件は CLAUDE.md の
+Completion gate を参照。
 
-## ステータス
+### エラー方針
 
-spec 01–08, 11(開く挙動 / タブ / キーボードナビ / ツリー / ファイル操作 / パスバー / フィルタ / アプリ内 DnD / タブホバー切替)は**完了済みのため spec ファイルを削除した**(内容は git 履歴を参照)。番号は欠番として扱い、再利用しない。
+- Rust コマンドは `Result<T, String>` を維持。エラーは人間可読な英語メッセージで、
+  フロントは `String(e)` をバナー表示するだけ。
+- フロントがエラー種別で分岐する必要が生じたら、その時点で serde タグ付き enum に
+  移行する。それまでは enum 化しない。
+- 書式はパスや名前をダブルクォートで含める: `Cannot read "{path}": {e}`、
+  `"{name}" already exists in the destination`、`Failed to {verb}: {e}`。
 
-| # | spec | 規模 | ステータス | 備考 |
-| --- | --- | --- | --- | --- |
-| 09 | [OS drop-in](09-dnd-os-drop.md) — OS からのドロップ受け入れ | 中 | 保留 | macOS で `dragDropEnabled: true` によりアプリ内 D&D が機能しなくなる回帰を確認、フォールバック(a)を選択し取り下げ |
-| 10 | [Drag-out](10-dnd-drag-out.md) — OS へのドラッグアウト | — | **保留** | ロードマップ外(調査記録) |
-| 12 | [Entry metadata](12-entry-metadata.md) — サイズ・更新日時カラム + symlink 表示 | 中 | 完了 | 正規導出パイプライン(sort → filter)を確立 |
-| 13 | [Sort columns](13-sort-columns.md) — カラムヘッダでソート切替 | 小 | 完了 | |
-| 14 | [Hidden files](14-hidden-files.md) — 隠しファイル表示トグル | 小 | 完了 | |
-| 15 | [Multi-select](15-multi-select.md) — 複数選択 | 大 | 完了 | 12–14 と入替自由(独立トラック) |
-| 16 | [Clipboard](16-clipboard.md) — アプリ内コピー / カット / ペースト | 中 | 完了 | OS クリップボード非依存 |
-| 17 | [Shortcuts & refresh](17-shortcuts-refresh.md) — ショートカット拡充 + 手動リフレッシュ | 中 | 完了 | |
-| 18 | [Virtualized list](18-virtualized-list.md) — ファイルリストの仮想化 | 中 | 完了 | 必ず最後 |
-| 19 | [Rubber-band select](19-rubber-band-select.md) — マウス範囲ドラッグ選択 | 小 | 完了 | 15 の追加 spec。FileList の行描画に触るため 18 より前に完了させる |
+### IPC
 
-ステータス値: `未着手` / `実装中` / `完了` / `保留`
+- ワイヤ上のフィールド名は snake_case(例: `is_dir`)。Rust 構造体に rename 属性を
+  付けず、TS interface 側も snake_case で揃える。
+- コマンド引数は TS 側 camelCase → Tauri が自動で Rust snake_case に変換する
+  (例: `targetDir` → `target_dir`)。
+- 新コマンドは必ず `src/lib/ipc.ts` に型付きラッパーを 1 つ追加する。
+- `Entry`(`name` / `path` / `is_dir` / `is_symlink` / `size` / `mtime`)は
+  Rust (`src-tauri/src/commands.rs`) と TS (`src/lib/ipc.ts`) でミラーされている。
+  フィールド追加時は両方を同時に更新する。
 
-## 依存グラフと実装順
+### Rust バックエンド
 
-推奨直列順: 12 → 13 → 14 → 15 → 16 → 17 → 19 → 18。
+- コマンドはすべて `src-tauri/src/commands.rs` に置き、`src-tauri/src/lib.rs` の
+  `tauri::generate_handler![...]` に登録する。アプリ定義コマンドは capability
+  (ACL) 登録不要。
+- `src-tauri/capabilities/default.json` の `opener:allow-open-path` は `$HOME/**`
+  スコープのまま**広げない**。capability・`tauri.conf.json` は明確な必要がない限り
+  触らない。
+- テストは `commands.rs` 内の `#[cfg(test)] mod tests` に追記。`tempfile::tempdir()`
+  で実 FS を使い、戻り値パスとエラー文字列の部分一致 (`err.contains(...)`) を
+  アサートする既存スタイルに従う。
 
-```
-12 entry-metadata ─→ 13 sort-columns      (12 のヘッダ行・sortEntries.ts を対話化)
-       └──────────→ 14 hidden-toggle      (12 と同じ read_directory を編集するため 12 の後に固定)
-15 multi-select ──→ 16 clipboard          (複数 paths の copy/cut/paste は選択モデル前提)
-15 multi-select ──→ 19 rubber-band-select (選択モデル前提。18 より前に完了させる)
-13 + 15 ─────────→ 17 shortcuts-refresh   (refresh が sort/filter/選択を保持するため 13/15 の後)
-13,15,16,17,19 ──→ 18 virtualization      (必ず最後。14 は FileList に触れないため依存外)
-```
+### ストア
 
-順序の意図:
+- リアクティブストアは `createStore` によるシングルトン facade(`src/store/explorer.ts`
+  方式): モジュールレベルで `state` を作り、`state` + アクションメソッドを持つ
+  plain object を export する。
+- **純粋ロジックは別モジュールに抽出**して単体テストする(`src/store/history.ts` が
+  先例: イミュータブルな純関数群 + 併置 `history.test.ts`)。リアクティブストア自体は
+  テストしない。
+- 非同期ロードは単調増加シーケンストークンでガードする(`explorer.ts` の `loadSeq`
+  パターン): 最新のロードだけが state をコミットする。
+- ロード失敗時は直前の一覧とパスを保持する(ユーザーがその場に留まる)。
 
-- **12 と 14 の順序は固定**: 両者は同じ Rust 関数 `read_directory` を編集するため、ベースラインの食い違いを避けて 12 を先にする
-- **12→13→14 トラックと 15→16 トラックは入替自由**: 相互に独立している
-- **17 は「貼るだけ」に保つ**: 新規挙動は refresh のみで、他のバインドの実体は先行 spec で完成済み。全バインドが既存アクションに対応してから一括で貼る
-- **18 は必ず最後**: 12/13/15/16/19 がすべて FileList の行描画に触るため、仮想化による描画の書き換えを行マークアップ確定後の 1 回で済ませる(旧ロードマップで 02 tabs を先頭に置いた判断と対の理由)
-- **19 は 15 完了後・18 より前**: ラバーバンド確定処理は現状の全行 DOM 描画を前提にヒットテストするため、仮想化(18)の前に確定させる
+### コンポーネント
 
-## 対象コードベースの要点(2026-07 時点)
+- コンポーネントは dumb に保つ: データとコールバックは props でのみ受け取る。
+  ストアへの参照は `src/App.tsx` だけが持ち、そこで配線する。
+- 選択判定は `createSelector` を使う(選択変更時に全行再評価しないため)。
+- ファイルリストは仮想化済み(`src/lib/virtual.ts`)。行の描画は行高 28px 固定と
+  ウィンドウイングを前提に書く。
+- ファイル名はコンポーネントが PascalCase(`FileItem.tsx`)+ 併置の `*.module.css`、
+  lib/store は camelCase(`ipc.ts`)。1 ファイル 1 関心、~300 行を超えたら分割。
 
-- Tauri v2 デスクトップアプリ。フロント: SolidJS + TypeScript + Vite、バックエンド: Rust(コマンドは `src-tauri/src/commands.rs` に集約)
-- 状態管理: シングルトン facade ストア(`src/store/explorer.ts`)+ 純粋ロジック分離(`src/store/history.ts`)
-- コンポーネントは dumb(props のみ)、配線は `src/App.tsx` に集約
-- 詳細な規約は [`00-conventions.md`](00-conventions.md) を参照
+### CSS
+
+- コンポーネントごとに CSS Modules(`Foo.module.css` を `styles` として import)。
+- **色は `src/App.css` の `:root` カスタムプロパティのみ使用**。既存トークン:
+  `--border-color` / `--hover-bg` / `--selected-bg` / `--drop-bg` / `--muted-color` /
+  `--menu-bg` / `--error-bg` / `--error-color`。**色のハードコード禁止**。
+- ダークモードは `@media (prefers-color-scheme: dark)` で同トークンを上書きして
+  自動対応。新トークンはライト・ダーク両方に同時追加する。
+- **行高は 28px 固定**(仮想化の前提条件)。行が出現するすべての UI(ファイルリスト、
+  ツリー、インライン編集行)で守る。
+- Kobalte のメニュー類は `[data-highlighted]` 属性でスタイルする。
+
+### UI ライブラリ
+
+- ヘッドレス UI(メニュー・ダイアログ等)は `@kobalte/core` のみ。**新しい UI
+  ライブラリを追加しない**。
+- アイコンは `lucide-solid/icons/<name>` の per-icon import のみ(バレル import
+  禁止)。拡張子→アイコンのマッピングは `src/lib/icons.ts` に集約。
+
+### テスト方針
+
+- **Vitest**: 純粋ロジックモジュールのみ対象。併置 `*.test.ts`、environment は node。
+- **DOM/E2E テストは導入しない**。UI 挙動は手動検証で担保する。テストフレームワークの
+  追加・変更は禁止。
+
+## 新機能を追加する場合
+
+実装前に Goal / Non-goals / 変更ファイル / 受け入れ基準を簡潔に書き出して合意する
+(Non-goals は禁止事項として扱い、変更は挙げたファイルに収める)。実装後は完了
+ゲートを通し、GUI 挙動は手動検証で締める。
+
+## 実装履歴
+
+| # | 機能 | 概要 |
+| --- | --- | --- |
+| 01–08, 11 | 基本 UX | 開く挙動 / タブ / キーボードナビ / ツリー / ファイル操作 / パスバー / フィルタ / アプリ内 DnD / タブホバー切替 |
+| 12 | Entry metadata | サイズ・更新日時カラム + symlink 表示(sort → filter の正規導出パイプラインを確立) |
+| 13 | Sort columns | カラムヘッダでソート切替 |
+| 14 | Hidden files | 隠しファイル表示トグル(セッション内のみ保持) |
+| 15 | Multi-select | 複数選択(Ctrl/Shift クリック) |
+| 16 | Clipboard | アプリ内コピー / カット / ペースト(OS クリップボード非依存) |
+| 17 | Shortcuts & refresh | ショートカット拡充 + 手動リフレッシュ |
+| 19 | Rubber-band select | マウス範囲ドラッグ選択 |
+| 18 | Virtualized list | ファイルリストの仮想化(全 spec の最後に実装) |
+
+## 保留作業(調査記録)
+
+どちらも未着手のまま取り下げ。再挑戦する場合は git 履歴の旧 spec
+(`spec/09-dnd-os-drop.md` / `spec/10-dnd-drag-out.md`)に詳細な設計・検証手順がある。
+
+### OS drop-in(旧 spec 09)— 取り下げ
+
+Finder 等からのドロップで現在ディレクトリへコピーする機能。`tauri.conf.json` の
+`dragDropEnabled: true` が **macOS でアプリ内 HTML5 D&D を壊す回帰**を確認し、
+フォールバック(a)「`false` に戻して取り下げ」を選択した。要点:
+
+- セマンティクスは copy 固定(ネイティブドラッグ中は修飾キーが読めない / 非破壊 /
+  クロスボリュームでも機能する)
+- 受け口は `getCurrentWebview().onDragDropEvent`(enter/over/leave/drop)
+- 再挑戦するなら、アプリ内 D&D を pointer events ベースの自前実装に置き換える
+  大改修(旧フォールバック(b))とセットで検討すること
+
+### Drag-out(旧 spec 10)— ロードマップ外
+
+アプリの行を OS へドラッグして実ファイルとして渡す機能。Tauri v2 コアには機能が
+なく、現実解は CrabNebula の `tauri-plugin-drag`(capability `drag:default` が必要、
+Linux/GTK の安定性が最大の懸念)。設計案は「Alt+ドラッグでネイティブドラッグアウトに
+opt-in、通常ドラッグは従来のアプリ内 D&D」。旧 spec 09 の問題が未解決のため前提が
+崩れており、着手には両プラットフォームでの PoC 再検証が必須。

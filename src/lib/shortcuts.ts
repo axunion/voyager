@@ -65,7 +65,7 @@ function matchAction(e: ShortcutInput): GlobalShortcutAction | null {
   return null;
 }
 
-// Pure mapping of the binding table (spec/17-shortcuts-refresh.md §4). Returns
+// Pure mapping of the global shortcut binding table. Returns
 // null when nothing matches, including suppressed-while-typing cases.
 export function matchGlobalShortcut(
   e: ShortcutInput,

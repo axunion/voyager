@@ -1,5 +1,5 @@
 // Pure windowing math for FileList's hand-rolled virtualization.
-// Mirrors the 28px row-height CSS invariant (00-conventions.md).
+// Mirrors the 28px row-height CSS invariant (spec/README.md).
 export const ROW_HEIGHT = 28;
 
 export interface VisibleRange {
