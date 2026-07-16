@@ -32,7 +32,12 @@ import {
   toggleSelect,
 } from "../lib/selection";
 import type { SortDir, SortKey } from "../lib/sortEntries";
-import { ensureVisible, type VisibleRange, visibleRange } from "../lib/virtual";
+import {
+  ensureVisible,
+  ROW_HEIGHT,
+  type VisibleRange,
+  visibleRange,
+} from "../lib/virtual";
 import type { EditingState } from "../store/explorer";
 import { FileItem } from "./FileItem";
 import itemStyles from "./FileItem.module.css";
@@ -223,9 +228,11 @@ export function FileList(props: FileListProps) {
 
   const [rubberBand, setRubberBand] = createSignal<RubberBandRect | null>(null);
 
-  // Rows render in the same order as props.entries, so pairing them by index
-  // avoids a per-entry DOM lookup. `containerTop`/`scrollTop` are passed in
-  // (read once per mousemove tick by the caller) rather than re-read here.
+  // Reads each row's path back from its DOM id (set by FileItem via rowId)
+  // rather than pairing rows with props.entries by index, so this stays
+  // correct regardless of the windowing offset. `containerTop`/`scrollTop`
+  // are passed in (read once per mousemove tick by the caller) rather than
+  // re-read here.
   const updateBandSelection = (
     containerTop: number,
     scrollTop: number,
@@ -235,14 +242,13 @@ export function FileList(props: FileListProps) {
     if (!containerRef) return;
     const rows = containerRef.querySelectorAll<HTMLElement>('[role="option"]');
     const hits: string[] = [];
-    const { start } = range();
-    rows.forEach((rowEl, index) => {
-      const entry = props.entries[start + index];
-      if (!entry) return;
+    rows.forEach((rowEl) => {
       const rect = rowEl.getBoundingClientRect();
       const rowTop = rect.top - containerTop + scrollTop;
       const rowBottom = rect.bottom - containerTop + scrollTop;
-      if (rowBottom >= top && rowTop <= bottom) hits.push(entry.path);
+      if (rowBottom >= top && rowTop <= bottom) {
+        hits.push(decodeURIComponent(rowEl.id));
+      }
     });
     props.onSelectionChange(bandSelect(props.entries, hits));
   };
@@ -428,7 +434,7 @@ export function FileList(props: FileListProps) {
     if (e.key === "PageUp" || e.key === "PageDown") {
       e.preventDefault();
       const pageSize = containerRef
-        ? Math.floor(containerRef.clientHeight / 28)
+        ? Math.floor(containerRef.clientHeight / ROW_HEIGHT)
         : 1;
       const next = entryAfterMove(
         props.entries,
