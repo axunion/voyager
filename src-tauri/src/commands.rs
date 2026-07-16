@@ -15,50 +15,56 @@ pub fn read_directory(path: String, include_hidden: bool) -> Result<Vec<Entry>, 
     let dir = std::fs::read_dir(&path).map_err(|e| format!("Cannot read \"{path}\": {e}"))?;
     let mut entries: Vec<Entry> = dir
         .filter_map(|res| res.ok())
-        .filter_map(|de| {
-            let name = de.file_name().to_string_lossy().into_owned();
-            // Hidden by cross-platform dotfile convention; Windows attribute-hidden
-            // files are intentionally not handled (no OS-specific code).
-            if !include_hidden && name.starts_with('.') {
-                return None;
-            }
-            let p = de.path();
-            // file_type() is free (readdir metadata); stat only for symlinks so
-            // a symlink to a directory still lists as a folder.
-            let file_type = de.file_type();
-            let is_symlink = matches!(&file_type, Ok(ft) if ft.is_symlink());
-            let is_dir = if is_symlink {
-                p.is_dir()
-            } else {
-                file_type
-                    .map(|ft| ft.is_dir())
-                    .unwrap_or_else(|_| p.is_dir())
-            };
-            // lstat (does not follow symlinks): a symlink to a file reports
-            // the link's own size, which is an intentional trade-off.
-            let metadata = de.metadata().ok();
-            let size = if is_dir {
-                None
-            } else {
-                metadata.as_ref().map(|m| m.len())
-            };
-            let mtime = metadata.as_ref().and_then(|m| m.modified().ok()).map(|t| {
-                t.duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs() as i64)
-                    .unwrap_or_else(|e| -(e.duration().as_secs() as i64))
-            });
-            Some(Entry {
-                is_dir,
-                is_symlink,
-                path: p.to_string_lossy().into_owned(),
-                name,
-                size,
-                mtime,
-            })
-        })
+        .filter_map(|de| entry_from_dir_entry(de, include_hidden))
         .collect();
     entries.sort_by_cached_key(|e| (!e.is_dir, e.name.to_lowercase()));
     Ok(entries)
+}
+
+/// Builds an `Entry` from a raw `DirEntry`, or `None` if it's a dotfile and
+/// `include_hidden` is false.
+fn entry_from_dir_entry(de: std::fs::DirEntry, include_hidden: bool) -> Option<Entry> {
+    let name = de.file_name().to_string_lossy().into_owned();
+    // Hidden by cross-platform dotfile convention; Windows attribute-hidden
+    // files are intentionally not handled (no OS-specific code).
+    if !include_hidden && name.starts_with('.') {
+        return None;
+    }
+    let p = de.path();
+    // Single lstat (does not follow symlinks) drives is_symlink, is_dir, size,
+    // and mtime; a symlink to a file/dir reports the link's own size and
+    // additionally needs p.is_dir() to see through to the target's type.
+    let metadata = de.metadata().ok();
+    let is_symlink = metadata
+        .as_ref()
+        .is_some_and(|m| m.file_type().is_symlink());
+    let is_dir = if is_symlink {
+        p.is_dir()
+    } else {
+        metadata
+            .as_ref()
+            .map(|m| m.is_dir())
+            .unwrap_or_else(|| p.is_dir())
+    };
+    let size = if is_dir {
+        None
+    } else {
+        metadata.as_ref().map(|m| m.len())
+    };
+    let mtime = metadata.as_ref().and_then(|m| m.modified().ok()).map(|t| {
+        match t.duration_since(std::time::UNIX_EPOCH) {
+            Ok(d) => d.as_secs() as i64,
+            Err(e) => -(e.duration().as_secs() as i64),
+        }
+    });
+    Some(Entry {
+        is_dir,
+        is_symlink,
+        path: p.to_string_lossy().into_owned(),
+        name,
+        size,
+        mtime,
+    })
 }
 
 /// Moves `source` into `target_dir`, keeping its file name. Returns the new path.
@@ -74,23 +80,10 @@ pub fn move_entry(source: String, target_dir: String) -> Result<String, String> 
     // Self-nesting is only possible when moving a directory, so pay for the
     // canonicalize-based containment check (symlink-safe) only in that case.
     if src.is_dir() {
-        let src_real = src
-            .canonicalize()
-            .map_err(|e| format!("Cannot access \"{source}\": {e}"))?;
-        let target_real = Path::new(&target_dir)
-            .canonicalize()
-            .map_err(|e| format!("Cannot access \"{target_dir}\": {e}"))?;
-        if target_real.starts_with(&src_real) {
-            return Err("Cannot move a folder into itself".into());
-        }
+        check_not_self_nested(src, &source, &target_dir, "move")?;
     }
-    if dest.exists() {
-        return Err(format!(
-            "\"{}\" already exists in the destination",
-            name.to_string_lossy()
-        ));
-    }
-    std::fs::rename(src, &dest).map_err(|e| format!("Failed to move: {e}"))?;
+    check_no_collision(&dest, name)?;
+    std::fs::rename(src, &dest).map_err(io_err("move"))?;
     Ok(dest.to_string_lossy().into_owned())
 }
 
@@ -108,29 +101,53 @@ pub fn copy_entry(source: String, target_dir: String) -> Result<String, String> 
     // Self-nesting is only possible when copying a directory, so pay for the
     // canonicalize-based containment check (symlink-safe) only in that case.
     if is_dir {
-        let src_real = src
-            .canonicalize()
-            .map_err(|e| format!("Cannot access \"{source}\": {e}"))?;
-        let target_real = Path::new(&target_dir)
-            .canonicalize()
-            .map_err(|e| format!("Cannot access \"{target_dir}\": {e}"))?;
-        if target_real.starts_with(&src_real) {
-            return Err("Cannot copy a folder into itself".into());
-        }
+        check_not_self_nested(src, &source, &target_dir, "copy")?;
     }
     let dest = Path::new(&target_dir).join(name);
+    check_no_collision(&dest, name)?;
+    if is_dir {
+        copy_dir_recursive(src, &dest).map_err(io_err("copy"))?;
+    } else {
+        std::fs::copy(src, &dest).map_err(io_err("copy"))?;
+    }
+    Ok(dest.to_string_lossy().into_owned())
+}
+
+/// Returns an error if `target_dir` is `src` itself or nested inside it.
+/// Symlink-safe: resolves both paths via `canonicalize` before comparing.
+fn check_not_self_nested(
+    src: &Path,
+    source: &str,
+    target_dir: &str,
+    verb: &str,
+) -> Result<(), String> {
+    let src_real = src
+        .canonicalize()
+        .map_err(|e| format!("Cannot access \"{source}\": {e}"))?;
+    let target_real = Path::new(target_dir)
+        .canonicalize()
+        .map_err(|e| format!("Cannot access \"{target_dir}\": {e}"))?;
+    if target_real.starts_with(&src_real) {
+        return Err(format!("Cannot {verb} a folder into itself"));
+    }
+    Ok(())
+}
+
+/// Returns an error if `dest` already exists.
+fn check_no_collision(dest: &Path, name: &std::ffi::OsStr) -> Result<(), String> {
     if dest.exists() {
         return Err(format!(
             "\"{}\" already exists in the destination",
             name.to_string_lossy()
         ));
     }
-    if is_dir {
-        copy_dir_recursive(src, &dest).map_err(|e| format!("Failed to copy: {e}"))?;
-    } else {
-        std::fs::copy(src, &dest).map_err(|e| format!("Failed to copy: {e}"))?;
-    }
-    Ok(dest.to_string_lossy().into_owned())
+    Ok(())
+}
+
+/// Builds an io-error mapper for `.map_err(io_err("verb"))`, formatting as
+/// `Failed to {verb}: {e}` per the error conventions in spec/README.md.
+fn io_err<E: std::fmt::Display>(verb: &str) -> impl Fn(E) -> String + '_ {
+    move |e| format!("Failed to {verb}: {e}")
 }
 
 /// Recursively copies the contents of `src` into a newly-created `dest` directory.
@@ -152,7 +169,7 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {
 
 #[tauri::command]
 pub fn move_to_trash(path: String) -> Result<(), String> {
-    trash::delete(&path).map_err(|e| format!("Failed to move to trash: {e}"))
+    trash::delete(&path).map_err(io_err("move to trash"))
 }
 
 /// Renames the entry at `path` to `new_name` within the same parent directory.
@@ -171,7 +188,7 @@ pub fn rename_entry(path: String, new_name: String) -> Result<String, String> {
     if dest.exists() {
         return Err(format!("\"{new_name}\" already exists"));
     }
-    std::fs::rename(src, &dest).map_err(|e| format!("Failed to rename: {e}"))?;
+    std::fs::rename(src, &dest).map_err(io_err("rename"))?;
     Ok(dest.to_string_lossy().into_owned())
 }
 
@@ -185,7 +202,7 @@ pub fn create_entry(parent: String, name: String, is_dir: bool) -> Result<String
         if e.kind() == std::io::ErrorKind::AlreadyExists {
             format!("\"{name}\" already exists")
         } else {
-            format!("Failed to create: {e}")
+            io_err("create")(e)
         }
     };
     if is_dir {
