@@ -34,3 +34,12 @@ coverage/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Unused `pnpm tauri icon` outputs (only the files listed in
+# tauri.conf.json bundle.icon are kept in the repo)
+src-tauri/icons/64x64.png
+src-tauri/icons/icon.png
+src-tauri/icons/Square*.png
+src-tauri/icons/StoreLogo.png
+src-tauri/icons/android/
+src-tauri/icons/ios/
