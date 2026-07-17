@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>Voyager app icon</title>
+  <!-- Regenerate all platform icons with:
+       pnpm tauri icon src-tauri/icons/icon.svg -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c3d63"/>
+      <stop offset="1" stop-color="#0b1b2f"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="330" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="10"/>
+  <polygon points="512,302 553,471 722,512 553,553 512,722 471,553 302,512 471,471" fill="#35597f"/>
+  <polygon points="512,192 554,470 832,512 554,554 512,832 470,554 192,512 470,470" fill="#f2f7fc"/>
+  <polygon points="512,192 554,470 512,512 470,470" fill="#f0b429"/>
+  <circle cx="512" cy="512" r="30" fill="#0b1b2f"/>
+</svg>
