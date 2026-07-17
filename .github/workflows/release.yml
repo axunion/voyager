@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tauri v2 build dependencies for Linux (patchelf and xdg-utils are for AppImage)
+      - if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Ad-hoc signing: required for Apple Silicon binaries without a Developer ID
+          APPLE_SIGNING_IDENTITY: "-"
+        with:
+          tagName: v__VERSION__
+          releaseName: "Voyager v__VERSION__"
+          releaseBody: |
+            Download the asset for your platform below.
+
+            **macOS**: builds are ad-hoc signed (no Apple Developer ID), so the first
+            launch is blocked by Gatekeeper. Allow it via System Settings >
+            Privacy & Security > "Open Anyway", or run:
+            `xattr -cr /Applications/voyager.app`
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

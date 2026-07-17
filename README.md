@@ -19,6 +19,15 @@ Tauri v2, SolidJS, and Rust.
 - **No OS clipboard.** File operations never touch the system clipboard.
 - **No content display.** File-type icons only — no previews or thumbnails.
 
+## Install
+
+Prebuilt binaries for macOS (Apple Silicon), Windows, and Linux are available
+on the [Releases](https://github.com/axunion/voyager/releases) page.
+
+macOS builds are ad-hoc signed (no Apple Developer ID), so the first launch is
+blocked by Gatekeeper. Allow it via System Settings > Privacy & Security >
+"Open Anyway", or run `xattr -cr /Applications/voyager.app`.
+
 ## Development
 
 Requires [Node.js](https://nodejs.org/) with [pnpm](https://pnpm.io/),
