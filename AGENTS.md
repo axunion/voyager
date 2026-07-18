@@ -13,9 +13,20 @@ use judgment.
 Voyager exists to be a lightweight file manager that leaves no traces. These
 are permanent constraints, not current limitations:
 
-- **Zero persistence.** Never write caches, history, or settings anywhere —
-  no localStorage/sessionStorage, no config files, no store plugins. All app
-  state lives in session-only memory and dies with the process.
+- **No OS traces (portable).** Voyager behaves like a portable app, meaning
+  three things: (1) it never alters OS state — no registry, OS settings,
+  default-app, or file-association changes; (2) it never reads file contents,
+  so it neither creates nor triggers content caches (once a file is handed to
+  the OS default app via the opener, external caching is out of scope); (3) it
+  never writes caches, history, or settings into OS locations (`~/Library`,
+  AppData, XDG) — no localStorage/sessionStorage, no store plugins, and the
+  webview runs with `incognito: true` so it leaves no WebKit/WebView2 data
+  directories. App state is session-only by default and dies with the process;
+  deliberate defaults (e.g. window size) replace remembered state. The only
+  sanctioned persistence is an opt-in sidecar settings file next to the
+  executable (next to the `.app` on macOS, never inside it), silently falling
+  back to session mode when that location is unwritable — see the portability
+  section of `spec/README.md`.
 - **No OS clipboard.** File copy/cut/paste uses the in-app clipboard only.
 - **No content display.** No previews or thumbnails; file-type icons only.
 - **Lightweight.** No new runtime dependencies unless explicitly agreed
