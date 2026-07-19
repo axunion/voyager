@@ -46,6 +46,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - uses: tauri-apps/tauri-action@v1
+        # tauri-action always expects msi/nsis artifacts on Windows and errors
+        # when none exist, even though bundling is intentionally disabled
+        # there (see tauri.windows.conf.json). The exe still compiles fine
+        # before that check runs, so let the job continue past it.
+        continue-on-error: ${{ matrix.platform == 'windows-latest' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Ad-hoc signing: required for Apple Silicon binaries without a Developer ID
