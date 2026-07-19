@@ -10,7 +10,8 @@ export type GlobalShortcutAction =
   | { type: "refresh" }
   | { type: "new-folder" }
   | { type: "parent-dir" }
-  | { type: "focus-filter" };
+  | { type: "focus-filter" }
+  | { type: "save-settings" };
 
 export interface ShortcutInput {
   key: string;
@@ -42,6 +43,7 @@ function matchAction(e: ShortcutInput): GlobalShortcutAction | null {
     if (key === "w") return { type: "close-tab" };
     if (key === "r") return { type: "refresh" };
     if (key === "f") return { type: "focus-filter" };
+    if (key === "s") return { type: "save-settings" };
     if (key === "arrowup") return { type: "parent-dir" };
     // Mod+1..8 → 0-based tab index; Mod+9 → -1 (last tab, browser convention).
     if (/^[1-9]$/.test(key)) {

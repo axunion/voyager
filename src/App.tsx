@@ -56,8 +56,13 @@ function App() {
   };
 
   onMount(() => {
-    explorer.init();
-    tree.init();
+    // Apply persisted settings (if a sidecar file exists) before the first
+    // directory load so showHidden is right from the initial listing.
+    // settings.init() never rejects, so no .catch is needed.
+    settings.init().then(() => {
+      explorer.init();
+      tree.init();
+    });
 
     const toShortcutInput = (e: KeyboardEvent): ShortcutInput => {
       const target = e.target as HTMLElement | null;
@@ -125,6 +130,9 @@ function App() {
         case "focus-filter":
           filterInputRef?.focus();
           break;
+        case "save-settings":
+          handleSetPersist(true);
+          break;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -140,6 +148,10 @@ function App() {
     settings.toggleShowHidden();
     explorer.reloadAllTabs();
     tree.refreshExpanded();
+  };
+
+  const handleSetPersist = (enabled: boolean) => {
+    settings.setPersist(enabled).catch((e) => explorer.setError(String(e)));
   };
 
   const handleOpen = (entries: Entry[]) => {
@@ -182,6 +194,8 @@ function App() {
         }}
         showHidden={settings.showHidden()}
         onToggleHidden={toggleHidden}
+        persistEnabled={settings.persistEnabled()}
+        onSetPersist={handleSetPersist}
       />
       <Show when={explorer.state.error}>
         <div class="error-banner" role="alert">

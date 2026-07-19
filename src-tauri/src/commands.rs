@@ -231,6 +231,76 @@ fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Resolves the sidecar settings file path for a given executable path:
+/// normally the exe's own directory. A macOS bundle exe
+/// (<Name>.app/Contents/MacOS/<exe>) resolves next to the .app instead,
+/// because the signed bundle is sealed. Detection is by path shape rather
+/// than #[cfg(target_os)] so the logic is unit-testable on every platform.
+/// Returns None only when the exe path has no parent.
+fn settings_file_path(exe: &Path) -> Option<std::path::PathBuf> {
+    let dir = exe.parent()?;
+    let target = bundle_parent_dir(dir).unwrap_or(dir);
+    Some(target.join("voyager.json"))
+}
+
+/// Returns the directory containing the .app bundle when `dir` is the
+/// MacOS directory of one (<Name>.app/Contents/MacOS), None otherwise.
+fn bundle_parent_dir(dir: &Path) -> Option<&Path> {
+    use std::ffi::OsStr;
+    if dir.file_name() != Some(OsStr::new("MacOS")) {
+        return None;
+    }
+    let contents = dir.parent()?;
+    if contents.file_name() != Some(OsStr::new("Contents")) {
+        return None;
+    }
+    let app = contents.parent()?;
+    if app.extension() != Some(OsStr::new("app")) {
+        return None;
+    }
+    app.parent()
+}
+
+/// Resolves the sidecar path for the running executable; the shared impure
+/// half of the settings commands below.
+fn resolve_settings_path() -> Result<std::path::PathBuf, String> {
+    let exe = std::env::current_exe().map_err(io_err("locate the executable"))?;
+    settings_file_path(&exe)
+        .ok_or_else(|| "Failed to resolve the settings file location".to_string())
+}
+
+/// Removes the sidecar settings file; an already-missing file is Ok.
+fn remove_settings(path: &Path) -> Result<(), String> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(io_err("delete settings")(e)),
+    }
+}
+
+/// Loads the raw sidecar settings file content. Ok(None) means "run
+/// session-only": file missing, unreadable, or exe path unresolvable.
+/// Never errs today; the Result stays per the command conventions.
+#[tauri::command]
+pub fn load_settings() -> Result<Option<String>, String> {
+    let path = resolve_settings_path().ok();
+    Ok(path.and_then(|p| std::fs::read_to_string(p).ok()))
+}
+
+/// Writes `content` verbatim to the sidecar settings file. The frontend
+/// owns the schema; this command is a byte sink.
+#[tauri::command]
+pub fn save_settings(content: String) -> Result<(), String> {
+    let path = resolve_settings_path()?;
+    std::fs::write(&path, content).map_err(io_err("save settings"))
+}
+
+/// Deletes the sidecar settings file (persistence turned off).
+#[tauri::command]
+pub fn delete_settings() -> Result<(), String> {
+    remove_settings(&resolve_settings_path()?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -594,5 +664,68 @@ mod tests {
 
         assert!(err.contains("cannot be empty"));
         assert!(src.exists());
+    }
+
+    #[test]
+    fn settings_file_path_uses_exe_dir_for_plain_exe() {
+        let path = settings_file_path(Path::new("/opt/voyager/voyager")).unwrap();
+        assert_eq!(path, Path::new("/opt/voyager/voyager.json"));
+    }
+
+    #[test]
+    fn settings_file_path_resolves_next_to_macos_bundle() {
+        let exe = Path::new("/Applications/Voyager.app/Contents/MacOS/voyager");
+        assert_eq!(
+            settings_file_path(exe).unwrap(),
+            Path::new("/Applications/voyager.json")
+        );
+    }
+
+    #[test]
+    fn settings_file_path_dev_mode_uses_target_dir() {
+        let exe = Path::new("/repo/src-tauri/target/debug/voyager");
+        assert_eq!(
+            settings_file_path(exe).unwrap(),
+            Path::new("/repo/src-tauri/target/debug/voyager.json")
+        );
+    }
+
+    #[test]
+    fn settings_file_path_near_miss_bundle_falls_back_to_exe_dir() {
+        // MacOS dir without a Contents parent.
+        let exe = Path::new("/x/MacOS/voyager");
+        assert_eq!(
+            settings_file_path(exe).unwrap(),
+            Path::new("/x/MacOS/voyager.json")
+        );
+        // Contents/MacOS whose grandparent lacks the .app extension.
+        let exe = Path::new("/x/Foo/Contents/MacOS/voyager");
+        assert_eq!(
+            settings_file_path(exe).unwrap(),
+            Path::new("/x/Foo/Contents/MacOS/voyager.json")
+        );
+    }
+
+    #[test]
+    fn settings_file_path_bundle_at_root_resolves() {
+        let exe = Path::new("/Voyager.app/Contents/MacOS/voyager");
+        assert_eq!(settings_file_path(exe).unwrap(), Path::new("/voyager.json"));
+    }
+
+    #[test]
+    fn remove_settings_deletes_existing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("voyager.json");
+        touch(&path);
+
+        remove_settings(&path).unwrap();
+
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn remove_settings_missing_file_is_ok() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(remove_settings(&tmp.path().join("voyager.json")).is_ok());
     }
 }

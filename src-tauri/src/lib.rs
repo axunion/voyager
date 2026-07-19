@@ -10,7 +10,10 @@ pub fn run() {
             commands::copy_entry,
             commands::move_to_trash,
             commands::rename_entry,
-            commands::create_entry
+            commands::create_entry,
+            commands::load_settings,
+            commands::save_settings,
+            commands::delete_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -29,6 +29,30 @@
   cursor: default;
 }
 
+/* Layered on the shared .menuItem: row layout for indicator + icon + label. */
+.menuCheckItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Check mark slot: always rendered at a fixed size and only toggled via
+   visibility, so checking never shifts the row layout. Kobalte puts
+   data-checked on the CheckboxItem root. */
+.menuIndicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  visibility: hidden;
+}
+
+.menuCheckItem[data-checked] .menuIndicator {
+  visibility: visible;
+}
+
 .filterInput {
   flex: none;
   width: 160px;

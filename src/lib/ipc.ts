@@ -26,3 +26,10 @@ export const renameEntry = (path: string, newName: string) =>
 
 export const createEntry = (parent: string, name: string, isDir: boolean) =>
   invoke<string>("create_entry", { parent, name, isDir });
+
+export const loadSettings = () => invoke<string | null>("load_settings");
+
+export const saveSettings = (content: string) =>
+  invoke<void>("save_settings", { content });
+
+export const deleteSettings = () => invoke<void>("delete_settings");

@@ -11,11 +11,17 @@ Tauri v2, SolidJS, and Rust.
 - Copy / cut / paste with an in-app clipboard
 - Sortable columns (name, size, modified time) and a hidden-files toggle
 - File operations: open, create, rename, move to trash, drag & drop
+- Opt-in "Remember settings" (gear menu or Mod+S) writing a portable
+  `voyager.json` next to the app
 
 ## Design principles
 
-- **Zero persistence.** No caches, history, or settings are written anywhere;
-  all state lives in memory and dies with the process.
+- **Zero persistence by default.** No caches, history, or settings are written
+  to OS locations; all state lives in memory and dies with the process. The one
+  opt-in exception: turning on "Remember settings" writes a single
+  `voyager.json` next to the executable (next to `Voyager.app` on macOS, never
+  inside it), and turning it off deletes the file. If that location is
+  unwritable, Voyager silently stays session-only.
 - **No OS clipboard.** File operations never touch the system clipboard.
 - **No content display.** File-type icons only — no previews or thumbnails.
 

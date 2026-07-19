@@ -97,9 +97,27 @@ describe("matchGlobalShortcut", () => {
     });
   });
 
+  it("matches Mod+S as save-settings", () => {
+    expect(matchGlobalShortcut(input({ key: "s", metaKey: true }))).toEqual({
+      type: "save-settings",
+    });
+    expect(matchGlobalShortcut(input({ key: "s", ctrlKey: true }))).toEqual({
+      type: "save-settings",
+    });
+  });
+
+  it("still fires save-settings while typing", () => {
+    expect(
+      matchGlobalShortcut(
+        input({ key: "s", metaKey: true, targetIsTextInput: true }),
+      ),
+    ).toEqual({ type: "save-settings" });
+  });
+
   it("does not match letters without Mod", () => {
     expect(matchGlobalShortcut(input({ key: "t" }))).toBeNull();
     expect(matchGlobalShortcut(input({ key: "r" }))).toBeNull();
+    expect(matchGlobalShortcut(input({ key: "s" }))).toBeNull();
   });
 
   it("suppresses new-folder and parent-dir while typing", () => {

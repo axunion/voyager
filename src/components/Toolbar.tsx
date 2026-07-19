@@ -1,7 +1,11 @@
+import * as DropdownMenu from "@kobalte/core/dropdown-menu";
 import ArrowLeft from "lucide-solid/icons/arrow-left";
 import ArrowRight from "lucide-solid/icons/arrow-right";
+import Check from "lucide-solid/icons/check";
 import Eye from "lucide-solid/icons/eye";
-import EyeOff from "lucide-solid/icons/eye-off";
+import Save from "lucide-solid/icons/save";
+import Settings from "lucide-solid/icons/settings";
+import itemStyles from "./FileItem.module.css";
 import { PathBar } from "./PathBar";
 import styles from "./Toolbar.module.css";
 
@@ -17,6 +21,8 @@ interface ToolbarProps {
   onFilterInputRef(el: HTMLInputElement): void;
   showHidden: boolean;
   onToggleHidden(): void;
+  persistEnabled: boolean;
+  onSetPersist(enabled: boolean): void;
 }
 
 export function Toolbar(props: ToolbarProps) {
@@ -48,17 +54,37 @@ export function Toolbar(props: ToolbarProps) {
       >
         <ArrowRight size={16} />
       </button>
-      <button
-        type="button"
-        class={styles.navButton}
-        onClick={() => props.onToggleHidden()}
-        aria-label={
-          props.showHidden ? "Hide hidden files" : "Show hidden files"
-        }
-        aria-pressed={props.showHidden}
-      >
-        {props.showHidden ? <Eye size={16} /> : <EyeOff size={16} />}
-      </button>
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger class={styles.navButton} aria-label="Settings">
+          <Settings size={16} />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content class={itemStyles.menu}>
+            <DropdownMenu.CheckboxItem
+              class={`${itemStyles.menuItem} ${styles.menuCheckItem}`}
+              checked={props.showHidden}
+              onChange={() => props.onToggleHidden()}
+            >
+              <span class={styles.menuIndicator}>
+                <Check size={14} />
+              </span>
+              <Eye size={14} />
+              Show hidden files
+            </DropdownMenu.CheckboxItem>
+            <DropdownMenu.CheckboxItem
+              class={`${itemStyles.menuItem} ${styles.menuCheckItem}`}
+              checked={props.persistEnabled}
+              onChange={(checked) => props.onSetPersist(checked)}
+            >
+              <span class={styles.menuIndicator}>
+                <Check size={14} />
+              </span>
+              <Save size={14} />
+              Remember settings
+            </DropdownMenu.CheckboxItem>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
       <PathBar currentPath={props.currentPath} onNavigate={props.onNavigate} />
       <input
         ref={props.onFilterInputRef}
