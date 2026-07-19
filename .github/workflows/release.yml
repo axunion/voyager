@@ -3,13 +3,36 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  # A single job creates the draft release up front so the parallel build
+  # jobs below only ever attach assets to it. Letting each build job create
+  # the release itself races and can produce duplicate drafts for one tag.
+  create-release:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_NOTES: |
+        Download the asset for your platform below.
+
+        **macOS**: builds are ad-hoc signed (no Apple Developer ID), so the first
+        launch is blocked by Gatekeeper. Allow it via System Settings >
+        Privacy & Security > "Open Anyway", or run:
+        `xattr -cr /Applications/voyager.app`
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "Voyager ${{ github.ref_name }}" \
+            --draft \
+            --notes "$RELEASE_NOTES"
+
   build:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -19,7 +42,6 @@ jobs:
           - platform: ubuntu-22.04
             args: ""
           - platform: windows-latest
-            args: ""
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -45,32 +67,26 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - uses: tauri-apps/tauri-action@v1
-        # tauri-action always expects msi/nsis artifacts on Windows and errors
-        # when none exist, even though bundling is intentionally disabled
-        # there (see tauri.windows.conf.json). The exe still compiles fine
-        # before that check runs, so let the job continue past it.
-        continue-on-error: ${{ matrix.platform == 'windows-latest' }}
+      # Windows bundling is intentionally disabled (msi/nsis are both
+      # installers; see tauri.windows.conf.json), and tauri-action errors
+      # when it finds no bundle artifacts — so build directly instead.
+      - if: matrix.platform == 'windows-latest'
+        run: pnpm tauri build
+
+      - if: matrix.platform != 'windows-latest'
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Ad-hoc signing: required for Apple Silicon binaries without a Developer ID
           APPLE_SIGNING_IDENTITY: "-"
         with:
-          tagName: v__VERSION__
-          releaseName: "Voyager v__VERSION__"
-          releaseBody: |
-            Download the asset for your platform below.
-
-            **macOS**: builds are ad-hoc signed (no Apple Developer ID), so the first
-            launch is blocked by Gatekeeper. Allow it via System Settings >
-            Privacy & Security > "Open Anyway", or run:
-            `xattr -cr /Applications/voyager.app`
-          releaseDraft: true
-          prerelease: false
+          # Matches the tag create-release used, so tauri-action finds that
+          # release and attaches assets instead of creating another one.
+          tagName: ${{ github.ref_name }}
           args: ${{ matrix.args }}
 
-      # Tauri has no portable bundle target for Windows (msi/nsis are both
-      # installers), so ship the raw exe zipped in its own folder instead.
+      # Tauri has no portable bundle target for Windows, so ship the raw exe
+      # zipped in its own folder instead.
       - if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
