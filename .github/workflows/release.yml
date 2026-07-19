@@ -63,3 +63,17 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      # Tauri has no portable bundle target for Windows (msi/nsis are both
+      # installers), so ship the raw exe zipped in its own folder instead.
+      - if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          New-Item -ItemType Directory -Path voyager | Out-Null
+          Copy-Item src-tauri/target/release/voyager.exe voyager/
+          $zip = "voyager_${version}_x64_portable.zip"
+          Compress-Archive -Path voyager -DestinationPath $zip
+          gh release upload "${{ github.ref_name }}" $zip --clobber
